@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "copilot-prompt-sharing-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/copilotPromptSharing/CopilotPromptSharingWebPart.js",
+          "manifest": "./src/webparts/copilotPromptSharing/CopilotPromptSharingWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "CopilotPromptSharingWebPartStrings": "lib/webparts/copilotPromptSharing/loc/{locale}.js"
+  }
+}
