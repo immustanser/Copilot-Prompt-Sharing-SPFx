@@ -4,12 +4,6 @@ import Header from '../Shared/Header';
 import KPICard from '../Shared/KPICard';
 import PromptService from '../Services/PromptService';
 import { IPrompt } from '../Models/IPrompt';
-import {
-    DetailsList,
-    DetailsListLayoutMode,
-    SelectionMode,
-    IColumn
-} from '@fluentui/react';
 
 interface IDashboardProps {
     context: WebPartContext;
@@ -46,16 +40,6 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         } finally {
 
         }
-    };
-
-
-    const paginationButtonStyle: React.CSSProperties = {
-        padding: '6px 12px',
-        marginLeft: '8px',
-        borderRadius: '6px',
-        border: '1px solid #d1d1d1',
-        background: '#ffffff',
-        cursor: 'pointer'
     };
 
     const promptData = prompts.map((item: IPrompt) => {
@@ -114,111 +98,27 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         return bValue.localeCompare(aValue);
     });
 
+    const headerStyle: React.CSSProperties = {
+        backgroundColor: '#0078d4',
+        color: '#ffffff',
+        padding: '14px 16px',
+        textAlign: 'left',
+        fontWeight: 600,
+        fontSize: '14px'
+    };
 
-    const columns: IColumn[] = [
-        {
-            key: 'promptName',
-            name: 'Prompt Name',
-            fieldName: 'promptName',
-            minWidth: 250,
-            maxWidth: 350,
-            isResizable: true
-        },
-        {
-            key: 'department',
-            name: 'Department',
-            fieldName: 'department',
-            minWidth: 120,
-            maxWidth: 150
-        },
-        {
-            key: 'aiTool',
-            name: 'AI Tool',
-            fieldName: 'aiTool',
-            minWidth: 120,
-            maxWidth: 150
-        },
-        {
-            key: 'status',
-            name: 'Status',
-            fieldName: 'status',
-            minWidth: 140,
-            maxWidth: 180,
-            onRender: (item) => {
-                const background =
-                    item.status === 'Approved'
-                        ? '#dff6dd'
-                        : item.status === 'Rejected'
-                            ? '#fde7e9'
-                            : '#fff4ce';
-
-                const color =
-                    item.status === 'Approved'
-                        ? '#107c10'
-                        : item.status === 'Rejected'
-                            ? '#d13438'
-                            : '#8a6d3b';
-
-                return (
-                    <span
-                        style={{
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            background,
-                            color,
-                            fontWeight: 600
-                        }}
-                    >
-                        {item.status}
-                    </span>
-                );
-            }
-        },
-        {
-            key: 'tags',
-            name: 'Tags',
-            fieldName: 'tags',
-            minWidth: 150
-        },
-        {
-            key: 'actions',
-            name: 'Actions',
-            minWidth: 120,
-            onRender: () => (
-                <>
-                    <button
-                        style={{
-                            border: 'none',
-                            background: 'transparent',
-                            color: '#0078d4',
-                            cursor: 'pointer',
-                            marginRight: '12px'
-                        }}
-                    >
-                        View
-                    </button>
-
-                    <button
-                        style={{
-                            border: 'none',
-                            background: 'transparent',
-                            color: '#0078d4',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Copy
-                    </button>
-                </>
-            )
-        }
-    ];
+    const cellStyle: React.CSSProperties = {
+        padding: '14px 16px',
+        borderBottom: '1px solid #edebe9',
+        fontSize: '14px'
+    };
 
 
     return (
         <div
             style={{
                 minHeight: '100vh',
-                backgroundColor: '#f5f7fa'
+                backgroundColor: '#f3f2f1'
             }}
         >
             <Header />
@@ -343,20 +243,122 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                     )}
                 </div>
 
-                <DetailsList
-                    items={sortedData}
-                    columns={columns}
-                    selectionMode={SelectionMode.none}
-                    layoutMode={DetailsListLayoutMode.justified}
-                    compact={true}
-                />
+                <div
+                    style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                    }}
+                >
+                    <table
+                        style={{
+                            width: '100%',
+                            borderCollapse: 'collapse'
+                        }}
+                    >
+                        <thead>
+                            <tr>
+                                <th style={{ ...headerStyle, width: '35%' }}>
+                                    Prompt Name
+                                </th>
 
+                                <th style={{ ...headerStyle, width: '15%' }}>
+                                    Department
+                                </th>
 
-                <span>Showing {sortedData.length} prompt(s)</span>
+                                <th style={{ ...headerStyle, width: '15%' }}>
+                                    AI Tool
+                                </th>
 
-                <div>
-                    <button style={paginationButtonStyle}>Previous</button>
-                    <button style={paginationButtonStyle}>Next</button>
+                                <th style={{ ...headerStyle, width: '15%' }}>
+                                    Status
+                                </th>
+
+                                <th style={{ ...headerStyle, width: '10%' }}>
+                                    Tags
+                                </th>
+
+                                <th style={{ ...headerStyle, width: '10%' }}>
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {sortedData.map((item, index) => (
+                                <tr
+                                    key={item.id}
+                                    style={{
+                                        backgroundColor:
+                                            index % 2 === 0
+                                                ? '#ffffff'
+                                                : '#f8f9fb'
+                                    }}
+                                >
+                                    <td style={cellStyle}>
+                                        <div
+                                            style={{
+                                                fontWeight: 600,
+                                                color: '#0078d4'
+                                            }}
+                                        >
+                                            {item.promptName}
+                                        </div>
+                                    </td>
+
+                                    <td style={cellStyle}>
+                                        {item.department}
+                                    </td>
+
+                                    <td style={cellStyle}>
+                                        {item.aiTool}
+                                    </td>
+
+                                    <td style={cellStyle}>
+                                        <span
+                                            style={{
+                                                padding: '4px 10px',
+                                                borderRadius: '20px',
+                                                fontWeight: 600,
+                                                whiteSpace: 'nowrap',
+                                                background:
+                                                    item.status === 'Approved'
+                                                        ? '#dff6dd'
+                                                        : item.status === 'Rejected'
+                                                            ? '#fde7e9'
+                                                            : '#fff4ce',
+                                                color:
+                                                    item.status === 'Approved'
+                                                        ? '#107c10'
+                                                        : item.status === 'Rejected'
+                                                            ? '#d13438'
+                                                            : '#8a6d3b'
+                                            }}
+                                        >
+                                            {item.status}
+                                        </span>
+                                    </td>
+
+                                    <td style={cellStyle}>
+                                        {item.tags}
+                                    </td>
+
+                                    <td style={cellStyle}>
+                                        <span
+                                            style={{
+                                                color: '#0078d4',
+                                                cursor: 'pointer',
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            View
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
