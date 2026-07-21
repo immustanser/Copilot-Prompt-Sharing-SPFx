@@ -14,10 +14,24 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
     const [searchText, setSearchText] = React.useState('');
     const [selectedDepartment, setSelectedDepartment] = React.useState('');
 
+    const [isAddPromptOpen, setIsAddPromptOpen] = React.useState(false);
+
+    const [newPrompt, setNewPrompt] = React.useState({
+        title: '',
+        aiTool: '',
+        department: '',
+        useCase: '',
+        tags: '',
+        promptText: ''
+    });
+
     const [sortColumn] =
         React.useState<string>('promptName');
 
     const [prompts, setPrompts] = React.useState<IPrompt[]>([]);
+
+    const [selectedPrompt, setSelectedPrompt] = React.useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
 
     const [sortDirection] =
         React.useState<'asc' | 'desc'>('asc');
@@ -113,6 +127,36 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         fontSize: '14px'
     };
 
+    const copyPromptText = (): void => {
+        if (!selectedPrompt) {
+            return;
+        }
+
+        navigator.clipboard.writeText(
+            selectedPrompt.promptText || ''
+        );
+
+        alert('Prompt copied successfully.');
+    };
+
+    const savePrompt = async (): Promise<void> => {
+
+        console.log('Prompt To Save', newPrompt);
+
+        // SharePoint save logic will go here next
+
+        setIsAddPromptOpen(false);
+
+        setNewPrompt({
+            title: '',
+            aiTool: '',
+            department: '',
+            useCase: '',
+            tags: '',
+            promptText: ''
+        });
+    };
+
 
     return (
         <div
@@ -132,7 +176,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                 <div
                     style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
                         gap: '16px',
                         marginBottom: '8px'
                     }}
@@ -206,11 +250,27 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                 <div
                     style={{
                         display: 'flex',
-                        gap: '10px',
-                        flexWrap: 'wrap',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
                         marginBottom: '12px'
                     }}
                 >
+                    <button
+                        onClick={() => setIsAddPromptOpen(true)}
+                        style={{
+                            backgroundColor: '#0078d4',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '10px 18px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                        }}
+                    >
+                        + Submit Prompt
+                    </button>
+                    
                     {['All', 'HR', 'Finance', 'Accounting', 'Stewart AI'].map(
                         (department) => (
                             <button
@@ -297,14 +357,25 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     }}
                                 >
                                     <td style={cellStyle}>
-                                        <div
+                                        <a
+                                            href="#"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+
+                                                console.log('Clicked Prompt:', item);
+
+                                                setSelectedPrompt(item);
+                                                setIsModalOpen(true);
+                                            }}
                                             style={{
+                                                color: '#0078d4',
                                                 fontWeight: 600,
-                                                color: '#0078d4'
+                                                textDecoration: 'underline',
+                                                cursor: 'pointer'
                                             }}
                                         >
                                             {item.promptName}
-                                        </div>
+                                        </a>
                                     </td>
 
                                     <td style={cellStyle}>
@@ -361,7 +432,403 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                     </table>
                 </div>
             </div>
-        </div>
+            {isModalOpen && selectedPrompt && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        zIndex: 9999,
+                        overflowY: 'auto',
+                        padding: '30px'
+                    }}
+                >
+                    <div
+                        style={{
+                            width: '800px',
+                            maxWidth: '95%',
+                            margin: '0 auto',
+                            backgroundColor: '#ffffff',
+                            borderRadius: '18px',
+                            overflow: 'hidden',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.25)'
+                        }}
+                    >
+                        {/* HEADER */}
+                        <div
+                            style={{
+                                background: 'linear-gradient(135deg,#006d8f,#1284b3)',
+                                color: '#fff',
+                                padding: '28px 36px',
+                                position: 'relative'
+                            }}
+                        >
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                style={{
+                                    position: 'absolute',
+                                    top: '20px',
+                                    right: '20px',
+                                    width: '42px',
+                                    height: '42px',
+                                    borderRadius: '50%',
+                                    border: '1px solid rgba(255,255,255,.3)',
+                                    background: 'transparent',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: '22px'
+                                }}
+                            >
+                                ✕
+                            </button>
+
+                            <h1
+                                style={{
+                                    margin: 0,
+                                    fontSize: '40px',
+                                    fontWeight: 700,
+                                    lineHeight: '1.2'
+                                }}
+                            >
+                                {selectedPrompt.promptName}
+                            </h1>
+                        </div>
+
+                        {/* BODY */}
+                        <div
+                            style={{
+                                padding: '24px',
+                                backgroundColor: '#f5f7fa'
+                            }}
+                        >
+                            {/* USE CASE */}
+                            <div
+                                style={{
+                                    background: '#fff',
+                                    borderRadius: '12px',
+                                    padding: '20px',
+                                    marginBottom: '20px'
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        color: '#006d8f',
+                                        fontWeight: 700,
+                                        marginBottom: '12px',
+                                        letterSpacing: '1px'
+                                    }}
+                                >
+                                    USE CASE
+                                </div>
+
+                                {selectedPrompt.useCase}
+                            </div>
+
+                            {/* DETAILS */}
+                            <div
+                                style={{
+                                    background: '#fff',
+                                    borderRadius: '12px',
+                                    padding: '20px',
+                                    marginBottom: '20px'
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        color: '#006d8f',
+                                        fontWeight: 700,
+                                        marginBottom: '20px',
+                                        letterSpacing: '1px'
+                                    }}
+                                >
+                                    DETAILS
+                                </div>
+
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: '24px'
+                                    }}
+                                >
+                                    <div>
+                                        <strong>Department</strong>
+                                        <div>{selectedPrompt.department}</div>
+                                    </div>
+
+                                    <div>
+                                        <strong>AI Tool</strong>
+                                        <div>{selectedPrompt.aiTool}</div>
+                                    </div>
+
+                                    <div>
+                                        <strong>Status</strong>
+                                        <div>{selectedPrompt.status}</div>
+                                    </div>
+
+                                    <div>
+                                        <strong>Tags</strong>
+                                        <div>{selectedPrompt.tags}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* PROMPT TEXT */}
+                            <div
+                                style={{
+                                    background: '#fff',
+                                    borderRadius: '12px',
+                                    padding: '20px'
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        marginBottom: '15px'
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            color: '#006d8f',
+                                            fontWeight: 700,
+                                            letterSpacing: '1px'
+                                        }}
+                                    >
+                                        PROMPT TEXT
+                                    </div>
+
+                                    <span
+                                        onClick={copyPromptText}
+                                        title="Copy Prompt"
+                                        style={{
+                                            cursor: 'pointer',
+                                            fontSize: '22px'
+                                        }}
+                                    >
+                                        📋
+                                    </span>
+                                </div>
+
+                                <div
+                                    style={{
+                                        background: '#f8f9fb',
+                                        padding: '18px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #edebe9',
+                                        whiteSpace: 'pre-wrap',
+                                        lineHeight: '1.7'
+                                    }}
+                                >
+                                    {selectedPrompt.promptText}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {isAddPromptOpen && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(0,0,0,.5)',
+                        zIndex: 9999,
+                        overflowY: 'auto',
+                        padding: '30px'
+                    }}
+                >
+                    <div
+                        style={{
+                            width: '900px',
+                            maxWidth: '95%',
+                            margin: '0 auto',
+                            backgroundColor: '#fff',
+                            borderRadius: '18px',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        <div
+                            style={{
+                                background: 'linear-gradient(135deg,#006d8f,#1284b3)',
+                                color: '#fff',
+                                padding: '24px 32px',
+                                position: 'relative'
+                            }}
+                        >
+                            <button
+                                onClick={() => setIsAddPromptOpen(false)}
+                                style={{
+                                    position: 'absolute',
+                                    top: '20px',
+                                    right: '20px',
+                                    width: '42px',
+                                    height: '42px',
+                                    borderRadius: '50%',
+                                    border: '1px solid rgba(255,255,255,.3)',
+                                    background: 'transparent',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: '22px'
+                                }}
+                            >
+                                ✕
+                            </button>
+
+                            <h2
+                                style={{
+                                    margin: 0
+                                }}
+                            >
+                                Submit New Prompt
+                            </h2>
+                        </div>
+
+                        <div
+                            style={{
+                                padding: '24px'
+                            }}
+                        >
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label>Prompt Name</label>
+                                <input
+                                    value={newPrompt.title}
+                                    onChange={(e) =>
+                                        setNewPrompt({
+                                            ...newPrompt,
+                                            title: e.target.value
+                                        })
+                                    }
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label>AI Tool</label>
+                                <input
+                                    value={newPrompt.aiTool}
+                                    onChange={(e) =>
+                                        setNewPrompt({
+                                            ...newPrompt,
+                                            aiTool: e.target.value
+                                        })
+                                    }
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label>Department</label>
+                                <input
+                                    value={newPrompt.department}
+                                    onChange={(e) =>
+                                        setNewPrompt({
+                                            ...newPrompt,
+                                            department: e.target.value
+                                        })
+                                    }
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label>Use Case</label>
+                                <textarea
+                                    rows={3}
+                                    value={newPrompt.useCase}
+                                    onChange={(e) =>
+                                        setNewPrompt({
+                                            ...newPrompt,
+                                            useCase: e.target.value
+                                        })
+                                    }
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label>Tags</label>
+                                <input
+                                    value={newPrompt.tags}
+                                    onChange={(e) =>
+                                        setNewPrompt({
+                                            ...newPrompt,
+                                            tags: e.target.value
+                                        })
+                                    }
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label>Prompt Text</label>
+                                <textarea
+                                    rows={8}
+                                    value={newPrompt.promptText}
+                                    onChange={(e) =>
+                                        setNewPrompt({
+                                            ...newPrompt,
+                                            promptText: e.target.value
+                                        })
+                                    }
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px'
+                                    }}
+                                />
+                            </div>
+
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'flex-end',
+                                    gap: '10px'
+                                }}
+                            >
+                                <button
+                                    onClick={() => setIsAddPromptOpen(false)}
+                                >
+                                    Cancel
+                                </button>
+
+                                <button
+                                    onClick={savePrompt}
+                                    style={{
+                                        backgroundColor: '#0078d4',
+                                        color: '#fff',
+                                        border: 'none',
+                                        padding: '10px 18px',
+                                        borderRadius: '6px'
+                                    }}
+                                >
+                                    Submit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div >
     );
 };
 
