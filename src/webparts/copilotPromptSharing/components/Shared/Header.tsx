@@ -4,14 +4,14 @@ const Header = (): JSX.Element => {
     return (
         <div
             style={{
-                background: 'linear-gradient(135deg, #0078d4, #106ebe)',
+                background: 'linear-gradient(135deg, #066C90,#0A83AE)',
                 padding: '18px 24px',
                 color: '#fff',
                 borderRadius: '18px',
                 margin: '16px',
                 textAlign: 'center',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                marginBottom: '12px'
+                marginBottom: '10px'
             }}
         >
             <h1

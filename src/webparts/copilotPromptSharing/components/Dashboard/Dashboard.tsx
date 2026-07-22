@@ -5,6 +5,7 @@ import KPICard from '../Shared/KPICard';
 import PromptService from '../Services/PromptService';
 import { IPrompt } from '../Models/IPrompt';
 
+
 interface IDashboardProps {
     context: WebPartContext;
 }
@@ -15,6 +16,12 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
     const [selectedDepartment, setSelectedDepartment] = React.useState('');
 
     const [isAddPromptOpen, setIsAddPromptOpen] = React.useState(false);
+    const [isEditMode, setIsEditMode] = React.useState(false);
+    const [editPromptId, setEditPromptId] = React.useState<number | null>(null);
+
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const itemsPerPage = 10;
+
 
     const [newPrompt, setNewPrompt] = React.useState({
         title: '',
@@ -25,16 +32,25 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         promptText: ''
     });
 
-    const [sortColumn] =
+    const [sortColumn, setSortColumn] =
         React.useState<string>('promptName');
+
+    const [sortDirection, setSortDirection] =
+        React.useState<'asc' | 'desc'>('asc');
 
     const [prompts, setPrompts] = React.useState<IPrompt[]>([]);
 
     const [selectedPrompt, setSelectedPrompt] = React.useState<any>(null);
     const [isModalOpen, setIsModalOpen] = React.useState(false);
 
-    const [sortDirection] =
-        React.useState<'asc' | 'desc'>('asc');
+    const [canAdd, setCanAdd] = React.useState(false);
+    const [canEdit, setCanEdit] = React.useState(false);
+    const [canDelete, setCanDelete] = React.useState(false);
+
+    const [departmentOptions, setDepartmentOptions] =
+        React.useState<string[]>([]);
+
+
 
     const [selectedStatus, setSelectedStatus] =
         React.useState<string>('All');
@@ -43,16 +59,49 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         void loadPrompts();
     }, []);
 
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [
+        searchText,
+        selectedDepartment,
+        selectedStatus
+    ]);
+
+
     const loadPrompts = async (): Promise<void> => {
         try {
             const promptService = new PromptService(props.context);
+
             const items = await promptService.getPrompts();
+            const departmentChoices =
+                await promptService.getDepartmentChoices();
+
+            setDepartmentOptions(
+                departmentChoices
+            );
+
+            const permissions =
+                await promptService.getPermissions();
 
             setPrompts(items);
-        } catch (error) {
-            console.log('Error loading prompts:', error);
-        } finally {
 
+            setCanAdd(
+                permissions.canAdd
+            );
+
+            setCanEdit(
+                permissions.canEdit
+            );
+
+            setCanDelete(
+                permissions.canDelete
+            );
+
+        } catch (error) {
+            console.log(
+                'Error loading prompts:',
+                error
+            );
         }
     };
 
@@ -98,11 +147,11 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
 
     sortedData.sort((a, b) => {
         const aValue = String(
-            a[sortColumn as keyof typeof a]
+            a[sortColumn as keyof typeof a] || ''
         ).toLowerCase();
 
         const bValue = String(
-            b[sortColumn as keyof typeof b]
+            b[sortColumn as keyof typeof b] || ''
         ).toLowerCase();
 
         if (sortDirection === 'asc') {
@@ -112,8 +161,17 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         return bValue.localeCompare(aValue);
     });
 
+    const totalPages = Math.ceil(
+        sortedData.length / itemsPerPage
+    );
+
+    const paginatedData = sortedData.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
     const headerStyle: React.CSSProperties = {
-        backgroundColor: '#0078d4',
+        backgroundColor: '#0A83AE',
         color: '#ffffff',
         padding: '14px 16px',
         textAlign: 'left',
@@ -127,6 +185,13 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         fontSize: '14px'
     };
 
+
+    const truncateStyle: React.CSSProperties = {
+        maxWidth: '180px',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+    };
     const copyPromptText = (): void => {
         if (!selectedPrompt) {
             return;
@@ -139,13 +204,42 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         alert('Prompt copied successfully.');
     };
 
-    const savePrompt = async (): Promise<void> => {
+    const openAddPromptModal = (): void => {
+        setIsEditMode(false);
+        setEditPromptId(null);
 
-        console.log('Prompt To Save', newPrompt);
+        setNewPrompt({
+            title: '',
+            aiTool: '',
+            department: '',
+            useCase: '',
+            tags: '',
+            promptText: ''
+        });
 
-        // SharePoint save logic will go here next
+        setIsAddPromptOpen(true);
+    };
 
+    const openEditPromptModal = (item: any): void => {
+        setIsEditMode(true);
+        setEditPromptId(item.id);
+
+        setNewPrompt({
+            title: item.promptName || '',
+            aiTool: item.aiTool || '',
+            department: item.department || '',
+            useCase: item.useCase || '',
+            tags: item.tags || '',
+            promptText: item.promptText || ''
+        });
+
+        setIsAddPromptOpen(true);
+    };
+
+    const closeAddPromptModal = (): void => {
         setIsAddPromptOpen(false);
+        setIsEditMode(false);
+        setEditPromptId(null);
 
         setNewPrompt({
             title: '',
@@ -157,6 +251,154 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         });
     };
 
+    const savePrompt = async (): Promise<void> => {
+        const title = newPrompt.title.trim();
+        const aiTool = newPrompt.aiTool.trim();
+        const department = newPrompt.department.trim();
+        const useCase = newPrompt.useCase.trim();
+        const tags = newPrompt.tags.trim();
+        const promptText = newPrompt.promptText.trim();
+
+        if (!title) {
+            alert('Please enter Prompt Name.');
+            return;
+        }
+
+        if (!aiTool) {
+            alert('Please enter AI Tool.');
+            return;
+        }
+
+        if (!department) {
+            alert('Please select Department.');
+            return;
+        }
+
+        if (!useCase) {
+            alert('Please enter Use Case.');
+            return;
+        }
+
+        if (!promptText) {
+            alert('Please enter Prompt Text.');
+            return;
+        }
+
+        try {
+            const promptService = new PromptService(props.context);
+
+            if (isEditMode && editPromptId !== null) {
+                await promptService.updatePrompt(
+                    editPromptId,
+                    {
+                        title,
+                        aiTool,
+                        department,
+                        useCase,
+                        tags,
+                        promptText
+                    }
+                );
+            } else {
+                await promptService.createPrompt({
+                    title,
+                    aiTool,
+                    department,
+                    useCase,
+                    tags,
+                    promptText
+                });
+            }
+
+            await loadPrompts();
+
+            setSelectedStatus('Send for Approval');
+            setSelectedDepartment('');
+
+            closeAddPromptModal();
+
+            alert(
+                isEditMode
+                    ? 'Prompt updated successfully and sent for approval.'
+                    : 'Prompt submitted successfully and sent for approval.'
+            );
+        } catch (error) {
+            console.log('Error saving prompt:', error);
+            alert('Something went wrong while saving the prompt. Please check the console for details.');
+        }
+    };
+
+    const departments = ['All'];
+
+    promptData.forEach(item => {
+        if (
+            item.department &&
+            departments.indexOf(item.department) === -1
+        ) {
+            departments.push(item.department);
+        }
+    });
+
+
+    const deletePrompt = async (
+        itemId: number
+    ): Promise<void> => {
+
+        const confirmed = window.confirm(
+            'Are you sure you want to delete this prompt?'
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+
+            const promptService =
+                new PromptService(props.context);
+
+            await promptService.deletePrompt(
+                itemId
+            );
+
+            await loadPrompts();
+
+            alert(
+                'Prompt deleted successfully.'
+            );
+
+        } catch (error) {
+
+            console.log(
+                'Error deleting prompt',
+                error
+            );
+
+            alert(
+                'Unable to delete prompt.'
+            );
+        }
+    };
+
+    const handleSort = (
+        column: string
+    ): void => {
+
+        if (sortColumn === column) {
+
+            setSortDirection(
+                sortDirection === 'asc'
+                    ? 'desc'
+                    : 'asc'
+            );
+
+        } else {
+
+            setSortColumn(column);
+            setSortDirection('asc');
+
+        }
+    };
 
     return (
         <div
@@ -178,13 +420,13 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                         display: 'grid',
                         gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
                         gap: '16px',
-                        marginBottom: '8px'
+                        marginBottom: '10px'
                     }}
                 >
                     <KPICard
                         title="Total Prompts"
                         value={promptData.length}
-                        color="#0078D4"
+                        color="#0A83AE"
                         selected={selectedStatus === 'All'}
                         onClick={() => setSelectedStatus('All')}
                     />
@@ -224,90 +466,119 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                 <div
                     style={{
                         background: '#fff',
-                        padding: '12px 16px',
+                        padding: '16px',
                         borderRadius: '12px',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                        marginBottom: '10px'
+                        marginBottom: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '16px'
                     }}
                 >
+                    <button
+                        disabled={!canAdd}
+                        onClick={
+                            canAdd
+                                ? openAddPromptModal
+                                : undefined
+                        }
+                        title={
+                            !canAdd
+                                ? 'You do not have permissions to add prompts'
+                                : ''
+                        }
+                        style={{
+                            backgroundColor: '#0A83AE',
+                            color: '#fff',
+                            border: 'none',
+                            padding: '10px 18px',
+                            borderRadius: '8px',
+                            cursor: canAdd
+                                ? 'pointer'
+                                : 'not-allowed',
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        + Add New Prompt
+                    </button>
+
                     <input
                         type="text"
                         placeholder="Search prompts..."
                         value={searchText}
-                        onChange={(e) => setSearchText(e.target.value)}
+                        onChange={(e) =>
+                            setSearchText(e.target.value)
+                        }
                         style={{
-                            width: '400px',
-                            maxWidth: '100%',
+                            flex: 1,
                             padding: '12px',
                             border: '1px solid #ddd',
                             borderRadius: '8px',
                             fontSize: '14px'
                         }}
                     />
-                </div>
 
-                {/* Department Filters */}
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '12px'
-                    }}
-                >
-                    <button
-                        onClick={() => setIsAddPromptOpen(true)}
+                    <div
                         style={{
-                            backgroundColor: '#0078d4',
-                            color: '#fff',
-                            border: 'none',
-                            padding: '10px 18px',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            whiteSpace: 'nowrap'
                         }}
                     >
-                        + Submit Prompt
-                    </button>
-                    
-                    {['All', 'HR', 'Finance', 'Accounting', 'Stewart AI'].map(
-                        (department) => (
-                            <button
-                                key={department}
-                                onClick={() =>
-                                    setSelectedDepartment(
-                                        department === 'All' ? '' : department
-                                    )
-                                }
+                        <span
+                            style={{
+                                fontWeight: 600,
+                                color: '#323130'
+                            }}
+                        >
+                            Department:
+                        </span>
 
-                                style={{
-                                    padding: '8px 16px',
-                                    borderRadius: '20px',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    background:
-                                        (
-                                            department === 'All' &&
-                                            selectedDepartment === ''
-                                        ) ||
-                                            selectedDepartment === department
-                                            ? '#005A9E'
-                                            : '#0078D4',
-                                    color: '#fff'
-                                }}
-                            >
-                                {department}
-                            </button>
-                        )
-                    )}
+                        <select
+                            value={selectedDepartment}
+                            onChange={(e) =>
+                                setSelectedDepartment(
+                                    e.target.value
+                                )
+                            }
+                            style={{
+                                padding: '10px',
+                                borderRadius: '8px',
+                                border: '1px solid #d1d1d1',
+                                minWidth: '180px'
+                            }}
+                        >
+                            <option value="">
+                                All
+                            </option>
+
+                            {departments
+                                .filter(
+                                    department =>
+                                        department !== 'All'
+                                )
+                                .map(
+                                    (department) => (
+                                        <option
+                                            key={department}
+                                            value={department}
+                                        >
+                                            {department}
+                                        </option>
+                                    )
+                                )}
+                        </select>
+                    </div>
                 </div>
 
                 <div
                     style={{
                         backgroundColor: '#ffffff',
                         borderRadius: '12px',
-                        overflow: 'hidden',
+                        overflowX: 'auto',
+                        overflowY: 'hidden',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
                     }}
                 >
@@ -319,20 +590,84 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                     >
                         <thead>
                             <tr>
-                                <th style={{ ...headerStyle, width: '35%' }}>
+                                <th
+                                    onClick={() =>
+                                        handleSort('promptName')
+                                    }
+                                    style={{
+                                        ...headerStyle,
+                                        width: '35%',
+                                        cursor: 'pointer'
+                                    }}
+                                >
                                     Prompt Name
+                                    {
+                                        sortColumn === 'promptName'
+                                            ? sortDirection === 'asc'
+                                                ? ' ▲'
+                                                : ' ▼'
+                                            : ''
+                                    }
                                 </th>
 
-                                <th style={{ ...headerStyle, width: '15%' }}>
+                                <th
+                                    onClick={() =>
+                                        handleSort('department')
+                                    }
+                                    style={{
+                                        ...headerStyle,
+                                        width: '15%',
+                                        cursor: 'pointer'
+                                    }}
+                                >
                                     Department
+                                    {
+                                        sortColumn === 'department'
+                                            ? sortDirection === 'asc'
+                                                ? ' ▲'
+                                                : ' ▼'
+                                            : ''
+                                    }
                                 </th>
 
-                                <th style={{ ...headerStyle, width: '15%' }}>
+                                <th
+                                    onClick={() =>
+                                        handleSort('aiTool')
+                                    }
+                                    style={{
+                                        ...headerStyle,
+                                        width: '15%',
+                                        cursor: 'pointer'
+                                    }}
+                                >
                                     AI Tool
+                                    {
+                                        sortColumn === 'aiTool'
+                                            ? sortDirection === 'asc'
+                                                ? ' ▲'
+                                                : ' ▼'
+                                            : ''
+                                    }
                                 </th>
 
-                                <th style={{ ...headerStyle, width: '15%' }}>
+                                <th
+                                    onClick={() =>
+                                        handleSort('status')
+                                    }
+                                    style={{
+                                        ...headerStyle,
+                                        width: '15%',
+                                        cursor: 'pointer'
+                                    }}
+                                >
                                     Status
+                                    {
+                                        sortColumn === 'status'
+                                            ? sortDirection === 'asc'
+                                                ? ' ▲'
+                                                : ' ▼'
+                                            : ''
+                                    }
                                 </th>
 
                                 <th style={{ ...headerStyle, width: '10%' }}>
@@ -346,7 +681,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                         </thead>
 
                         <tbody>
-                            {sortedData.map((item, index) => (
+                            {paginatedData.map((item, index) => (
                                 <tr
                                     key={item.id}
                                     style={{
@@ -368,7 +703,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                                 setIsModalOpen(true);
                                             }}
                                             style={{
-                                                color: '#0078d4',
+                                                color: '#0A83AE',
                                                 fontWeight: 600,
                                                 textDecoration: 'underline',
                                                 cursor: 'pointer'
@@ -383,8 +718,17 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     </td>
 
                                     <td style={cellStyle}>
-                                        {item.aiTool}
+                                        <div
+                                            title={item.aiTool}
+                                            style={{
+                                                ...truncateStyle,
+                                                maxWidth: '90px'
+                                            }}
+                                        >
+                                            {item.aiTool}
+                                        </div>
                                     </td>
+
 
                                     <td style={cellStyle}>
                                         <span
@@ -412,24 +756,201 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     </td>
 
                                     <td style={cellStyle}>
-                                        {item.tags}
+                                        <div
+                                            title={item.tags}
+                                            style={{
+                                                ...truncateStyle,
+                                                maxWidth: '90px'
+                                            }}
+                                        >
+                                            {item.tags}
+                                        </div>
                                     </td>
 
                                     <td style={cellStyle}>
-                                        <span
+                                        <div
                                             style={{
-                                                color: '#0078d4',
-                                                cursor: 'pointer',
-                                                fontWeight: 600
+                                                display: 'flex',
+                                                gap: '12px'
                                             }}
                                         >
-                                            View
-                                        </span>
+                                            <span
+                                                onClick={
+                                                    canEdit
+                                                        ? () => openEditPromptModal(item)
+                                                        : undefined
+                                                }
+                                                style={{
+                                                    opacity: canEdit ? 1 : 0.5,
+                                                    cursor: canEdit ? 'pointer' : 'not-allowed'
+                                                }}
+                                                title={
+                                                    !canEdit
+                                                        ? 'You do not have permissions to edit prompts'
+                                                        : ''
+                                                }
+                                            >
+                                                ✏️
+                                            </span>
+
+                                            <span
+                                                onClick={
+                                                    canDelete
+                                                        ? () => deletePrompt(item.id)
+                                                        : undefined
+                                                }
+                                                style={{
+                                                    opacity: canDelete ? 1 : 0.5,
+                                                    cursor: canDelete ? 'pointer' : 'not-allowed'
+                                                }}
+                                                title={
+                                                    !canDelete
+                                                        ? 'You do not have permissions to delete prompts'
+                                                        : ''
+                                                }
+                                            >
+                                                🗑️
+                                            </span>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '12px 20px',
+                            borderTop: '1px solid #edebe9',
+                            backgroundColor: '#fafafa'
+                        }}
+                    >
+                        <span>
+                            Showing {
+                                paginatedData.length > 0
+                                    ? ((currentPage - 1) * itemsPerPage) + 1
+                                    : 0
+                            }
+                            -
+                            {
+                                ((currentPage - 1) * itemsPerPage) +
+                                paginatedData.length
+                            }
+                            {' '}of{' '}
+                            {sortedData.length}
+                        </span>
+
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                        >
+                            <span
+                                onClick={() => setCurrentPage(1)}
+                                style={{
+                                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                    opacity: currentPage === 1 ? 0.4 : 1,
+                                    padding: '6px',
+                                    userSelect: 'none'
+                                }}
+                            >
+                                «
+                            </span>
+
+                            <span
+                                onClick={() => {
+                                    if (currentPage > 1) {
+                                        setCurrentPage(currentPage - 1);
+                                    }
+                                }}
+                                style={{
+                                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                    opacity: currentPage === 1 ? 0.4 : 1,
+                                    padding: '6px',
+                                    userSelect: 'none'
+                                }}
+                            >
+                                ‹
+                            </span>
+
+                            {[...Array(totalPages)].map(
+                                (_item: undefined, index: number) => {
+                                    const pageNumber = index + 1;
+
+                                    return (
+                                        <span
+                                            key={pageNumber}
+                                            onClick={() => setCurrentPage(pageNumber)}
+                                            style={{
+                                                cursor: 'pointer',
+                                                padding: '6px 10px',
+                                                borderRadius: '6px',
+                                                fontWeight:
+                                                    currentPage === pageNumber
+                                                        ? 600
+                                                        : 400,
+                                                backgroundColor:
+                                                    currentPage === pageNumber
+                                                        ? '#E6F4F9'
+                                                        : 'transparent',
+                                                color:
+                                                    currentPage === pageNumber
+                                                        ? '#0A83AE'
+                                                        : '#323130'
+                                            }}
+                                        >
+                                            {pageNumber}
+                                        </span>
+                                    );
+                                }
+                            )}
+
+
+                            <span
+                                onClick={() => {
+                                    if (currentPage < totalPages) {
+                                        setCurrentPage(currentPage + 1);
+                                    }
+                                }}
+                                style={{
+                                    cursor:
+                                        currentPage >= totalPages
+                                            ? 'not-allowed'
+                                            : 'pointer',
+                                    opacity:
+                                        currentPage >= totalPages
+                                            ? 0.4
+                                            : 1,
+                                    padding: '6px',
+                                    userSelect: 'none'
+                                }}
+                            >
+                                ›
+                            </span>
+
+                            <span
+                                onClick={() => setCurrentPage(totalPages)}
+                                style={{
+                                    cursor:
+                                        currentPage >= totalPages
+                                            ? 'not-allowed'
+                                            : 'pointer',
+                                    opacity:
+                                        currentPage >= totalPages
+                                            ? 0.4
+                                            : 1,
+                                    padding: '6px',
+                                    userSelect: 'none'
+                                }}
+                            >
+                                »
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
             {isModalOpen && selectedPrompt && (
@@ -460,7 +981,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                         {/* HEADER */}
                         <div
                             style={{
-                                background: 'linear-gradient(135deg,#006d8f,#1284b3)',
+                                background: 'linear-gradient(135deg,#066C90,#0A83AE)',
                                 color: '#fff',
                                 padding: '28px 36px',
                                 position: 'relative'
@@ -661,7 +1182,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                             }}
                         >
                             <button
-                                onClick={() => setIsAddPromptOpen(false)}
+                                onClick={closeAddPromptModal}
                                 style={{
                                     position: 'absolute',
                                     top: '20px',
@@ -681,109 +1202,240 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
 
                             <h2
                                 style={{
-                                    margin: 0
+                                    margin: 0,
+                                    fontSize: '30px',
+                                    fontWeight: 700
                                 }}
                             >
-                                Submit New Prompt
+                                {isEditMode ? 'Edit Prompt' : 'Add New Prompt'}
                             </h2>
+
+                            <div
+                                style={{
+                                    marginTop: '8px',
+                                    opacity: .9
+                                }}
+                            >
+                                {isEditMode
+                                    ? 'Update this prompt and send it back for approval.'
+                                    : 'Share a useful Copilot prompt with Stewart Title users'}
+                            </div>
                         </div>
 
                         <div
                             style={{
-                                padding: '24px'
+                                padding: '24px',
+                                backgroundColor: '#f5f7fa'
                             }}
                         >
-
-                            <div style={{ marginBottom: '16px' }}>
-                                <label>Prompt Name</label>
-                                <input
-                                    value={newPrompt.title}
-                                    onChange={(e) =>
-                                        setNewPrompt({
-                                            ...newPrompt,
-                                            title: e.target.value
-                                        })
-                                    }
+                            {/* Prompt Details */}
+                            <div
+                                style={{
+                                    backgroundColor: '#ffffff',
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    marginBottom: '20px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                                }}
+                            >
+                                <div
                                     style={{
-                                        width: '100%',
-                                        padding: '10px'
+                                        color: '#006d8f',
+                                        fontWeight: 700,
+                                        letterSpacing: '1px',
+                                        marginBottom: '20px'
                                     }}
-                                />
+                                >
+                                    PROMPT DETAILS
+                                </div>
+
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 600
+                                    }}>
+                                        Prompt Name *
+                                    </label>
+
+                                    <input
+                                        value={newPrompt.title}
+                                        onChange={(e) =>
+                                            setNewPrompt({
+                                                ...newPrompt,
+                                                title: e.target.value
+                                            })
+                                        }
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px',
+                                            borderRadius: '10px',
+                                            border: '1px solid #d1d1d1',
+                                            fontSize: '14px'
+                                        }}
+                                    />
+                                </div>
+
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                                        columnGap: '20px',
+                                        marginBottom: '20px'
+                                    }}
+                                >
+                                    <div>
+                                        <label style={{
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 600
+                                        }}>
+                                            AI Tool *
+                                        </label>
+
+                                        <input
+                                            value={newPrompt.aiTool}
+                                            onChange={(e) =>
+                                                setNewPrompt({
+                                                    ...newPrompt,
+                                                    aiTool: e.target.value
+                                                })
+                                            }
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px',
+                                                borderRadius: '10px',
+                                                border: '1px solid #d1d1d1',
+                                                fontSize: '14px',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label style={{
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 600
+                                        }}>
+                                            Department *
+                                        </label>
+
+                                        <select
+                                            value={newPrompt.department}
+                                            onChange={(e) =>
+                                                setNewPrompt({
+                                                    ...newPrompt,
+                                                    department: e.target.value
+                                                })
+                                            }
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px',
+                                                borderRadius: '10px',
+                                                border: '1px solid #d1d1d1',
+                                                fontSize: '14px',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        >
+                                            <option value="">
+                                                Select Department
+                                            </option>
+
+                                            {departmentOptions.map(
+                                                (department: string) => (
+                                                    <option
+                                                        key={department}
+                                                        value={department}
+                                                    >
+                                                        {department}
+                                                    </option>
+                                                )
+                                            )}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginBottom: '20px' }}>
+                                    <label style={{
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 600
+                                    }}>
+                                        Tags
+                                    </label>
+
+                                    <input
+                                        value={newPrompt.tags}
+                                        onChange={(e) =>
+                                            setNewPrompt({
+                                                ...newPrompt,
+                                                tags: e.target.value
+                                            })
+                                        }
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px',
+                                            borderRadius: '10px',
+                                            border: '1px solid #d1d1d1',
+                                            fontSize: '14px'
+                                        }}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label style={{
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 600
+                                    }}>
+                                        Use Case *
+                                    </label>
+
+                                    <textarea
+                                        rows={4}
+                                        value={newPrompt.useCase}
+                                        onChange={(e) =>
+                                            setNewPrompt({
+                                                ...newPrompt,
+                                                useCase: e.target.value
+                                            })
+                                        }
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px',
+                                            borderRadius: '10px',
+                                            border: '1px solid #d1d1d1',
+                                            fontSize: '14px',
+                                            resize: 'vertical'
+                                        }}
+                                    />
+                                </div>
                             </div>
 
-                            <div style={{ marginBottom: '16px' }}>
-                                <label>AI Tool</label>
-                                <input
-                                    value={newPrompt.aiTool}
-                                    onChange={(e) =>
-                                        setNewPrompt({
-                                            ...newPrompt,
-                                            aiTool: e.target.value
-                                        })
-                                    }
+                            {/* Prompt Text */}
+                            <div
+                                style={{
+                                    backgroundColor: '#ffffff',
+                                    borderRadius: '16px',
+                                    padding: '24px',
+                                    marginBottom: '20px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                                }}
+                            >
+                                <div
                                     style={{
-                                        width: '100%',
-                                        padding: '10px'
+                                        color: '#006d8f',
+                                        fontWeight: 700,
+                                        letterSpacing: '1px',
+                                        marginBottom: '20px'
                                     }}
-                                />
-                            </div>
+                                >
+                                    PROMPT TEXT
+                                </div>
 
-                            <div style={{ marginBottom: '16px' }}>
-                                <label>Department</label>
-                                <input
-                                    value={newPrompt.department}
-                                    onChange={(e) =>
-                                        setNewPrompt({
-                                            ...newPrompt,
-                                            department: e.target.value
-                                        })
-                                    }
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px'
-                                    }}
-                                />
-                            </div>
-
-                            <div style={{ marginBottom: '16px' }}>
-                                <label>Use Case</label>
                                 <textarea
-                                    rows={3}
-                                    value={newPrompt.useCase}
-                                    onChange={(e) =>
-                                        setNewPrompt({
-                                            ...newPrompt,
-                                            useCase: e.target.value
-                                        })
-                                    }
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px'
-                                    }}
-                                />
-                            </div>
-
-                            <div style={{ marginBottom: '16px' }}>
-                                <label>Tags</label>
-                                <input
-                                    value={newPrompt.tags}
-                                    onChange={(e) =>
-                                        setNewPrompt({
-                                            ...newPrompt,
-                                            tags: e.target.value
-                                        })
-                                    }
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px'
-                                    }}
-                                />
-                            </div>
-
-                            <div style={{ marginBottom: '16px' }}>
-                                <label>Prompt Text</label>
-                                <textarea
-                                    rows={8}
+                                    rows={10}
                                     value={newPrompt.promptText}
                                     onChange={(e) =>
                                         setNewPrompt({
@@ -793,20 +1445,32 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     }
                                     style={{
                                         width: '100%',
-                                        padding: '10px'
+                                        padding: '16px',
+                                        borderRadius: '12px',
+                                        border: '1px solid #d1d1d1',
+                                        fontSize: '14px',
+                                        resize: 'vertical'
                                     }}
                                 />
                             </div>
 
+                            {/* Footer */}
                             <div
                                 style={{
                                     display: 'flex',
                                     justifyContent: 'flex-end',
-                                    gap: '10px'
+                                    gap: '12px'
                                 }}
                             >
                                 <button
-                                    onClick={() => setIsAddPromptOpen(false)}
+                                    onClick={closeAddPromptModal}
+                                    style={{
+                                        padding: '12px 22px',
+                                        borderRadius: '10px',
+                                        border: '1px solid #d1d1d1',
+                                        backgroundColor: '#ffffff',
+                                        cursor: 'pointer'
+                                    }}
                                 >
                                     Cancel
                                 </button>
@@ -814,14 +1478,17 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                 <button
                                     onClick={savePrompt}
                                     style={{
-                                        backgroundColor: '#0078d4',
+                                        backgroundColor: '#0A83AE',
                                         color: '#fff',
                                         border: 'none',
-                                        padding: '10px 18px',
-                                        borderRadius: '6px'
+                                        padding: '12px 24px',
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        fontWeight: 600,
+                                        boxShadow: '0 4px 12px rgba(0,120,212,.25)'
                                     }}
                                 >
-                                    Submit
+                                    {isEditMode ? 'Update and Send for Approval' : 'Send for Approval'}
                                 </button>
                             </div>
                         </div>

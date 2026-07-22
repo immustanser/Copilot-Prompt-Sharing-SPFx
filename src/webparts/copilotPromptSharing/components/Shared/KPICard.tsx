@@ -21,7 +21,7 @@ const KPICard = ({
       style={{
         backgroundColor: '#ffffff',
         borderRadius: '16px',
-        minHeight: '75px',
+        minHeight: '60px',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -37,7 +37,7 @@ const KPICard = ({
     >
       <div
         style={{
-          fontSize: '12px',
+          fontSize: '14px',
           fontWeight: 600,
           color: '#323130',
           marginBottom: '4px'
@@ -48,7 +48,7 @@ const KPICard = ({
 
       <div
         style={{
-          fontSize: '28px',
+          fontSize: '20px',
           fontWeight: 700,
           color: '#323130'
         }}
