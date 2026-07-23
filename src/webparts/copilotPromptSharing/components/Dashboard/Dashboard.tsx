@@ -774,43 +774,47 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                                 gap: '12px'
                                             }}
                                         >
-                                            <span
-                                                onClick={
-                                                    canEdit
-                                                        ? () => openEditPromptModal(item)
-                                                        : undefined
-                                                }
-                                                style={{
-                                                    opacity: canEdit ? 1 : 0.5,
-                                                    cursor: canEdit ? 'pointer' : 'not-allowed'
-                                                }}
-                                                title={
-                                                    !canEdit
-                                                        ? 'You do not have permissions to edit prompts'
-                                                        : ''
-                                                }
-                                            >
-                                                ✏️
-                                            </span>
+                                            {item.status !== 'Send for Approval' && (
+                                                <>
+                                                    <span
+                                                        onClick={
+                                                            canEdit
+                                                                ? () => openEditPromptModal(item)
+                                                                : undefined
+                                                        }
+                                                        style={{
+                                                            opacity: canEdit ? 1 : 0.5,
+                                                            cursor: canEdit ? 'pointer' : 'not-allowed'
+                                                        }}
+                                                        title={
+                                                            !canEdit
+                                                                ? 'You do not have permissions to edit prompts'
+                                                                : ''
+                                                        }
+                                                    >
+                                                        ✏️
+                                                    </span>
 
-                                            <span
-                                                onClick={
-                                                    canDelete
-                                                        ? () => deletePrompt(item.id)
-                                                        : undefined
-                                                }
-                                                style={{
-                                                    opacity: canDelete ? 1 : 0.5,
-                                                    cursor: canDelete ? 'pointer' : 'not-allowed'
-                                                }}
-                                                title={
-                                                    !canDelete
-                                                        ? 'You do not have permissions to delete prompts'
-                                                        : ''
-                                                }
-                                            >
-                                                🗑️
-                                            </span>
+                                                    <span
+                                                        onClick={
+                                                            canDelete
+                                                                ? () => deletePrompt(item.id)
+                                                                : undefined
+                                                        }
+                                                        style={{
+                                                            opacity: canDelete ? 1 : 0.5,
+                                                            cursor: canDelete ? 'pointer' : 'not-allowed'
+                                                        }}
+                                                        title={
+                                                            !canDelete
+                                                                ? 'You do not have permissions to delete prompts'
+                                                                : ''
+                                                        }
+                                                    >
+                                                        🗑️
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
