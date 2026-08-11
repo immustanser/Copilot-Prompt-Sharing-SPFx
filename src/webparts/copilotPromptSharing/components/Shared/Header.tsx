@@ -21,7 +21,7 @@ const Header = (): JSX.Element => {
                     fontWeight: 700
                 }}
             >
-                Copilot Prompt Sharing
+                Stewart AI Prompt Library
             </h1>
 
             <div

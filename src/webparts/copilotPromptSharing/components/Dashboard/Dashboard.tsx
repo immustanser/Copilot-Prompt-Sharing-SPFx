@@ -5,12 +5,44 @@ import KPICard from '../Shared/KPICard';
 import PromptService from '../Services/PromptService';
 import { IPrompt } from '../Models/IPrompt';
 
-
 interface IDashboardProps {
     context: WebPartContext;
 }
 
+interface IToast {
+    id: number;
+    message: string;
+    type: 'success' | 'error';
+}
+
 const Dashboard = (props: IDashboardProps): JSX.Element => {
+
+    // Single service instance for the component lifetime
+    const promptService = React.useMemo(
+        () => new PromptService(props.context),
+        []
+    );
+
+    // Cached after first load – reused by post-CRUD lightweight refreshes
+    const currentUserIdRef = React.useRef<number>(0);
+
+    const toastIdRef = React.useRef(0);
+    const [toasts, setToasts] = React.useState<IToast[]>([]);
+
+    const showToast = (
+        message: string,
+        type: 'success' | 'error' = 'success'
+    ): void => {
+        const id = ++toastIdRef.current;
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+        }, 4500);
+    };
+
+    const dismissToast = (id: number): void => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+    };
 
     const [searchText, setSearchText] = React.useState('');
     const [selectedDepartment, setSelectedDepartment] = React.useState('');
@@ -50,7 +82,12 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
     const [departmentOptions, setDepartmentOptions] =
         React.useState<string[]>([]);
 
+    const [aiToolOptions, setAiToolOptions] =
+        React.useState<string[]>([]);
 
+    const [isPageLoading, setIsPageLoading] = React.useState(true);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [deletingId, setDeletingId] = React.useState<number | null>(null);
 
     const [selectedStatus, setSelectedStatus] =
         React.useState<string>('All');
@@ -70,38 +107,19 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
 
     const loadPrompts = async (): Promise<void> => {
         try {
-            const promptService = new PromptService(props.context);
-
-            const items = await promptService.getPrompts();
-            const departmentChoices =
-                await promptService.getDepartmentChoices();
-
-            setDepartmentOptions(
-                departmentChoices
-            );
-
-            const permissions =
-                await promptService.getPermissions();
-
-            setPrompts(items);
-
-            setCanAdd(
-                permissions.canAdd
-            );
-
-            setCanEdit(
-                permissions.canEdit
-            );
-
-            setCanDelete(
-                permissions.canDelete
-            );
-
+            const data = await promptService.initializeDashboard();
+            currentUserIdRef.current = data.currentUserId;
+            setPrompts(data.prompts);
+            setDepartmentOptions(data.departmentChoices);
+            setAiToolOptions(data.aiToolChoices);
+            setCanAdd(data.permissions.canAdd);
+            setCanEdit(data.permissions.canEdit);
+            setCanDelete(data.permissions.canDelete);
         } catch (error) {
-            console.log(
-                'Error loading prompts:',
-                error
-            );
+            console.error('Error loading dashboard:', error);
+            showToast('Failed to load prompts. Please refresh the page.', 'error');
+        } finally {
+            setIsPageLoading(false);
         }
     };
 
@@ -109,7 +127,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         return {
             id: item.Id,
             promptName: item.Title,
-            aiTool: item.AiToolOfChoice,
+            aiTool: item.AiTool,
             department: item.Department,
             status: item.Status,
             tags: item.Tags,
@@ -201,7 +219,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
             selectedPrompt.promptText || ''
         );
 
-        alert('Prompt copied successfully.');
+        showToast('Prompt copied to clipboard.');
     };
 
     const openAddPromptModal = (): void => {
@@ -260,71 +278,84 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         const promptText = newPrompt.promptText.trim();
 
         if (!title) {
-            alert('Please enter Prompt Name.');
+            showToast('Please enter Prompt Name.', 'error');
             return;
         }
 
         if (!aiTool) {
-            alert('Please enter AI Tool.');
+            showToast('Please select AI Tool.', 'error');
             return;
         }
 
         if (!department) {
-            alert('Please select Department.');
+            showToast('Please select Department.', 'error');
             return;
         }
 
         if (!useCase) {
-            alert('Please enter Use Case.');
+            showToast('Please enter Use Case.', 'error');
             return;
         }
 
         if (!promptText) {
-            alert('Please enter Prompt Text.');
+            showToast('Please enter Prompt Text.', 'error');
             return;
         }
 
-        try {
-            const promptService = new PromptService(props.context);
+        setIsSaving(true);
 
+        try {
             if (isEditMode && editPromptId !== null) {
-                await promptService.updatePrompt(
-                    editPromptId,
-                    {
-                        title,
-                        aiTool,
-                        department,
-                        useCase,
-                        tags,
-                        promptText
-                    }
-                );
+                await promptService.updatePrompt(editPromptId, {
+                    title, aiTool, department, useCase, tags, promptText
+                });
+
+                // Optimistic update — all values are known, no network refresh needed
+                setPrompts(prev => prev.map(p =>
+                    p.Id === editPromptId
+                        ? {
+                            Id: editPromptId,
+                            Title: title,
+                            AiTool: aiTool,
+                            Department: department,
+                            UseCase: useCase,
+                            Tags: tags,
+                            PromptText: promptText,
+                            Status: 'Send for Approval'
+                        }
+                        : p
+                ));
+
+                closeAddPromptModal();
+                setSelectedStatus('Send for Approval');
+                setSelectedDepartment('');
+                showToast('Prompt updated successfully and sent for approval.');
+
             } else {
                 await promptService.createPrompt({
-                    title,
-                    aiTool,
-                    department,
-                    useCase,
-                    tags,
-                    promptText
+                    title, aiTool, department, useCase, tags, promptText
                 });
+
+                // Close modal and notify immediately for snappy UX
+                closeAddPromptModal();
+                setSelectedStatus('Send for Approval');
+                setSelectedDepartment('');
+                showToast('Prompt submitted successfully and sent for approval.');
+
+                // Lightweight refresh to get the new item with its server-assigned Id
+                const freshItems = await promptService.refreshPrompts(
+                    currentUserIdRef.current
+                );
+                setPrompts(freshItems);
             }
-
-            await loadPrompts();
-
-            setSelectedStatus('Send for Approval');
-            setSelectedDepartment('');
-
-            closeAddPromptModal();
-
-            alert(
-                isEditMode
-                    ? 'Prompt updated successfully and sent for approval.'
-                    : 'Prompt submitted successfully and sent for approval.'
-            );
         } catch (error) {
-            console.log('Error saving prompt:', error);
-            alert('Something went wrong while saving the prompt. Please check the console for details.');
+            console.error('Error saving prompt:', error);
+            showToast(
+                'Something went wrong while saving the prompt. Please try again.',
+                'error'
+            );
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -340,43 +371,26 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
     });
 
 
-    const deletePrompt = async (
-        itemId: number
-    ): Promise<void> => {
-
+    const deletePrompt = async (itemId: number): Promise<void> => {
         const confirmed = window.confirm(
             'Are you sure you want to delete this prompt?'
         );
+        if (!confirmed) return;
 
-        if (!confirmed) {
-            return;
-        }
+        setDeletingId(itemId);
 
         try {
+            await promptService.deletePrompt(itemId);
 
-            const promptService =
-                new PromptService(props.context);
-
-            await promptService.deletePrompt(
-                itemId
-            );
-
-            await loadPrompts();
-
-            alert(
-                'Prompt deleted successfully.'
-            );
+            // Optimistic remove — no round trip needed since we know exactly what was deleted
+            setPrompts(prev => prev.filter(p => p.Id !== itemId));
+            showToast('Prompt deleted successfully.');
 
         } catch (error) {
-
-            console.log(
-                'Error deleting prompt',
-                error
-            );
-
-            alert(
-                'Unable to delete prompt.'
-            );
+            console.error('Error deleting prompt:', error);
+            showToast('Unable to delete prompt. Please try again.', 'error');
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -407,6 +421,54 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                 backgroundColor: '#f3f2f1'
             }}
         >
+            <style>{`
+                @keyframes cpsp-spin {
+                    to { transform: rotate(360deg); }
+                }
+                @keyframes cpsp-fadeIn {
+                    from { opacity: 0; transform: translateX(24px); }
+                    to   { opacity: 1; transform: translateX(0); }
+                }
+            `}</style>
+
+            {isPageLoading && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(243,242,241,0.97)',
+                        zIndex: 9998,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '18px'
+                    }}
+                >
+                    <div
+                        style={{
+                            width: '52px',
+                            height: '52px',
+                            border: '5px solid rgba(10,131,174,0.2)',
+                            borderTopColor: '#0A83AE',
+                            borderRadius: '50%',
+                            animation: 'cpsp-spin 0.75s linear infinite'
+                        }}
+                    />
+                    <p
+                        style={{
+                            margin: 0,
+                            color: '#0A83AE',
+                            fontWeight: 600,
+                            fontSize: '16px',
+                            letterSpacing: '0.3px'
+                        }}
+                    >
+                        Loading prompts...
+                    </p>
+                </div>
+            )}
+
             <Header />
 
             <div
@@ -771,49 +833,77 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                         <div
                                             style={{
                                                 display: 'flex',
-                                                gap: '12px'
+                                                gap: '12px',
+                                                alignItems: 'center'
                                             }}
                                         >
                                             {item.status !== 'Send for Approval' && (
-                                                <>
+                                                deletingId === item.id ? (
                                                     <span
-                                                        onClick={
-                                                            canEdit
-                                                                ? () => openEditPromptModal(item)
-                                                                : undefined
-                                                        }
                                                         style={{
-                                                            opacity: canEdit ? 1 : 0.5,
-                                                            cursor: canEdit ? 'pointer' : 'not-allowed'
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '5px',
+                                                            fontSize: '12px',
+                                                            color: '#0A83AE',
+                                                            fontWeight: 600
                                                         }}
-                                                        title={
-                                                            !canEdit
-                                                                ? 'You do not have permissions to edit prompts'
-                                                                : ''
-                                                        }
                                                     >
-                                                        ✏️
+                                                        <span
+                                                            style={{
+                                                                width: '14px',
+                                                                height: '14px',
+                                                                border: '2px solid rgba(10,131,174,0.25)',
+                                                                borderTopColor: '#0A83AE',
+                                                                borderRadius: '50%',
+                                                                display: 'inline-block',
+                                                                flexShrink: 0,
+                                                                animation: 'cpsp-spin 0.75s linear infinite'
+                                                            }}
+                                                        />
+                                                        Deleting...
                                                     </span>
+                                                ) : (
+                                                    <>
+                                                        <span
+                                                            onClick={
+                                                                canEdit && deletingId === null
+                                                                    ? () => openEditPromptModal(item)
+                                                                    : undefined
+                                                            }
+                                                            style={{
+                                                                opacity: canEdit && deletingId === null ? 1 : 0.4,
+                                                                cursor: canEdit && deletingId === null ? 'pointer' : 'not-allowed'
+                                                            }}
+                                                            title={
+                                                                !canEdit
+                                                                    ? 'You do not have permissions to edit prompts'
+                                                                    : ''
+                                                            }
+                                                        >
+                                                            ✏️
+                                                        </span>
 
-                                                    <span
-                                                        onClick={
-                                                            canDelete
-                                                                ? () => deletePrompt(item.id)
-                                                                : undefined
-                                                        }
-                                                        style={{
-                                                            opacity: canDelete ? 1 : 0.5,
-                                                            cursor: canDelete ? 'pointer' : 'not-allowed'
-                                                        }}
-                                                        title={
-                                                            !canDelete
-                                                                ? 'You do not have permissions to delete prompts'
-                                                                : ''
-                                                        }
-                                                    >
-                                                        🗑️
-                                                    </span>
-                                                </>
+                                                        <span
+                                                            onClick={
+                                                                canDelete && deletingId === null
+                                                                    ? () => deletePrompt(item.id)
+                                                                    : undefined
+                                                            }
+                                                            style={{
+                                                                opacity: canDelete && deletingId === null ? 1 : 0.4,
+                                                                cursor: canDelete && deletingId === null ? 'pointer' : 'not-allowed'
+                                                            }}
+                                                            title={
+                                                                !canDelete
+                                                                    ? 'You do not have permissions to delete prompts'
+                                                                    : ''
+                                                            }
+                                                        >
+                                                            🗑️
+                                                        </span>
+                                                    </>
+                                                )
                                             )}
                                         </div>
                                     </td>
@@ -1186,7 +1276,8 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                             }}
                         >
                             <button
-                                onClick={closeAddPromptModal}
+                                onClick={isSaving ? undefined : closeAddPromptModal}
+                                disabled={isSaving}
                                 style={{
                                     position: 'absolute',
                                     top: '20px',
@@ -1197,8 +1288,9 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     border: '1px solid rgba(255,255,255,.3)',
                                     background: 'transparent',
                                     color: '#fff',
-                                    cursor: 'pointer',
-                                    fontSize: '22px'
+                                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                                    fontSize: '22px',
+                                    opacity: isSaving ? 0.4 : 1
                                 }}
                             >
                                 ✕
@@ -1229,9 +1321,48 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                         <div
                             style={{
                                 padding: '24px',
-                                backgroundColor: '#f5f7fa'
+                                backgroundColor: '#f5f7fa',
+                                position: 'relative'
                             }}
                         >
+                            {isSaving && (
+                                <div
+                                    style={{
+                                        position: 'absolute',
+                                        inset: 0,
+                                        backgroundColor: 'rgba(245,247,250,0.9)',
+                                        zIndex: 10,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '14px',
+                                        borderRadius: '0 0 18px 18px',
+                                        cursor: 'wait'
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: '46px',
+                                            height: '46px',
+                                            border: '4px solid rgba(10,131,174,0.2)',
+                                            borderTopColor: '#0A83AE',
+                                            borderRadius: '50%',
+                                            animation: 'cpsp-spin 0.75s linear infinite'
+                                        }}
+                                    />
+                                    <p
+                                        style={{
+                                            margin: 0,
+                                            color: '#0A83AE',
+                                            fontWeight: 600,
+                                            fontSize: '15px'
+                                        }}
+                                    >
+                                        {isEditMode ? 'Saving changes...' : 'Submitting prompt...'}
+                                    </p>
+                                </div>
+                            )}
                             {/* Prompt Details */}
                             <div
                                 style={{
@@ -1253,33 +1384,73 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     PROMPT DETAILS
                                 </div>
 
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{
-                                        display: 'block',
-                                        marginBottom: '8px',
-                                        fontWeight: 600
-                                    }}>
-                                        Prompt Name *
-                                    </label>
+                                {/* Row 1 – Prompt Name | Tags */}
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                                        columnGap: '20px',
+                                        marginBottom: '20px'
+                                    }}
+                                >
+                                    <div>
+                                        <label style={{
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 600
+                                        }}>
+                                            Prompt Name *
+                                        </label>
 
-                                    <input
-                                        value={newPrompt.title}
-                                        onChange={(e) =>
-                                            setNewPrompt({
-                                                ...newPrompt,
-                                                title: e.target.value
-                                            })
-                                        }
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px',
-                                            borderRadius: '10px',
-                                            border: '1px solid #d1d1d1',
-                                            fontSize: '14px'
-                                        }}
-                                    />
+                                        <input
+                                            value={newPrompt.title}
+                                            onChange={(e) =>
+                                                setNewPrompt({
+                                                    ...newPrompt,
+                                                    title: e.target.value
+                                                })
+                                            }
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px',
+                                                borderRadius: '10px',
+                                                border: '1px solid #d1d1d1',
+                                                fontSize: '14px',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label style={{
+                                            display: 'block',
+                                            marginBottom: '8px',
+                                            fontWeight: 600
+                                        }}>
+                                            Tags
+                                        </label>
+
+                                        <input
+                                            value={newPrompt.tags}
+                                            onChange={(e) =>
+                                                setNewPrompt({
+                                                    ...newPrompt,
+                                                    tags: e.target.value
+                                                })
+                                            }
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px',
+                                                borderRadius: '10px',
+                                                border: '1px solid #d1d1d1',
+                                                fontSize: '14px',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                    </div>
                                 </div>
 
+                                {/* Row 2 – AI Tool | Department */}
                                 <div
                                     style={{
                                         display: 'grid',
@@ -1297,7 +1468,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                             AI Tool *
                                         </label>
 
-                                        <input
+                                        <select
                                             value={newPrompt.aiTool}
                                             onChange={(e) =>
                                                 setNewPrompt({
@@ -1313,7 +1484,22 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                                 fontSize: '14px',
                                                 boxSizing: 'border-box'
                                             }}
-                                        />
+                                        >
+                                            <option value="">
+                                                Select AI Tool
+                                            </option>
+
+                                            {aiToolOptions.map(
+                                                (tool: string) => (
+                                                    <option
+                                                        key={tool}
+                                                        value={tool}
+                                                    >
+                                                        {tool}
+                                                    </option>
+                                                )
+                                            )}
+                                        </select>
                                     </div>
 
                                     <div>
@@ -1360,33 +1546,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     </div>
                                 </div>
 
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{
-                                        display: 'block',
-                                        marginBottom: '8px',
-                                        fontWeight: 600
-                                    }}>
-                                        Tags
-                                    </label>
-
-                                    <input
-                                        value={newPrompt.tags}
-                                        onChange={(e) =>
-                                            setNewPrompt({
-                                                ...newPrompt,
-                                                tags: e.target.value
-                                            })
-                                        }
-                                        style={{
-                                            width: '100%',
-                                            padding: '12px',
-                                            borderRadius: '10px',
-                                            border: '1px solid #d1d1d1',
-                                            fontSize: '14px'
-                                        }}
-                                    />
-                                </div>
-
+                                {/* Row 3 – Use Case (full width) */}
                                 <div>
                                     <label style={{
                                         display: 'block',
@@ -1411,7 +1571,8 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                             borderRadius: '10px',
                                             border: '1px solid #d1d1d1',
                                             fontSize: '14px',
-                                            resize: 'vertical'
+                                            resize: 'vertical',
+                                            boxSizing: 'border-box'
                                         }}
                                     />
                                 </div>
@@ -1453,7 +1614,8 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                         borderRadius: '12px',
                                         border: '1px solid #d1d1d1',
                                         fontSize: '14px',
-                                        resize: 'vertical'
+                                        resize: 'vertical',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
                             </div>
@@ -1467,36 +1629,131 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                 }}
                             >
                                 <button
-                                    onClick={closeAddPromptModal}
+                                    onClick={isSaving ? undefined : closeAddPromptModal}
+                                    disabled={isSaving}
                                     style={{
                                         padding: '12px 22px',
                                         borderRadius: '10px',
                                         border: '1px solid #d1d1d1',
                                         backgroundColor: '#ffffff',
-                                        cursor: 'pointer'
+                                        cursor: isSaving ? 'not-allowed' : 'pointer',
+                                        opacity: isSaving ? 0.5 : 1
                                     }}
                                 >
                                     Cancel
                                 </button>
 
                                 <button
-                                    onClick={savePrompt}
+                                    onClick={isSaving ? undefined : savePrompt}
+                                    disabled={isSaving}
                                     style={{
-                                        backgroundColor: '#0A83AE',
+                                        backgroundColor: isSaving ? '#7bbfd6' : '#0A83AE',
                                         color: '#fff',
                                         border: 'none',
                                         padding: '12px 24px',
                                         borderRadius: '10px',
-                                        cursor: 'pointer',
+                                        cursor: isSaving ? 'not-allowed' : 'pointer',
                                         fontWeight: 600,
-                                        boxShadow: '0 4px 12px rgba(0,120,212,.25)'
+                                        boxShadow: '0 4px 12px rgba(0,120,212,.25)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
                                     }}
                                 >
-                                    {isEditMode ? 'Update and Send for Approval' : 'Send for Approval'}
+                                    {isSaving && (
+                                        <span
+                                            style={{
+                                                width: '16px',
+                                                height: '16px',
+                                                border: '2px solid rgba(255,255,255,0.4)',
+                                                borderTopColor: '#fff',
+                                                borderRadius: '50%',
+                                                display: 'inline-block',
+                                                animation: 'cpsp-spin 0.75s linear infinite',
+                                                flexShrink: 0
+                                            }}
+                                        />
+                                    )}
+                                    {isSaving
+                                        ? (isEditMode ? 'Saving...' : 'Submitting...')
+                                        : (isEditMode ? 'Update and Send for Approval' : 'Send for Approval')
+                                    }
                                 </button>
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+            {/* Toast notification stack */}
+            {toasts.length > 0 && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: '24px',
+                        right: '24px',
+                        zIndex: 99999,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        maxWidth: '400px',
+                        minWidth: '300px'
+                    }}
+                >
+                    {toasts.map(toast => (
+                        <div
+                            key={toast.id}
+                            style={{
+                                backgroundColor: '#ffffff',
+                                borderRadius: '10px',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
+                                borderLeft: `5px solid ${
+                                    toast.type === 'success' ? '#107C10' : '#D13438'
+                                }`,
+                                padding: '14px 16px',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: '12px',
+                                animation: 'cpsp-fadeIn 0.25s ease'
+                            }}
+                        >
+                            <span
+                                style={{
+                                    fontSize: '18px',
+                                    flexShrink: 0,
+                                    lineHeight: '1.4'
+                                }}
+                            >
+                                {toast.type === 'success' ? '✅' : '❌'}
+                            </span>
+
+                            <span
+                                style={{
+                                    flex: 1,
+                                    fontSize: '14px',
+                                    color: '#323130',
+                                    lineHeight: '1.5'
+                                }}
+                            >
+                                {toast.message}
+                            </span>
+
+                            <button
+                                onClick={() => dismissToast(toast.id)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#605e5c',
+                                    fontSize: '16px',
+                                    padding: '0',
+                                    flexShrink: 0,
+                                    lineHeight: 1
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    ))}
                 </div>
             )}
         </div >
