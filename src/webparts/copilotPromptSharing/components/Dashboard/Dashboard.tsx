@@ -1251,101 +1251,133 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                     style={{
                         position: 'fixed',
                         inset: 0,
-                        backgroundColor: 'rgba(0,0,0,.5)',
+                        backgroundColor: 'rgba(0,0,0,0.55)',
                         zIndex: 9999,
                         overflowY: 'auto',
-                        padding: '30px'
+                        padding: '24px 16px',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'center'
                     }}
                 >
                     <div
                         style={{
-                            width: '900px',
-                            maxWidth: '95%',
-                            margin: '0 auto',
+                            width: '100%',
+                            maxWidth: '1020px',
                             backgroundColor: '#fff',
-                            borderRadius: '18px',
-                            overflow: 'hidden'
+                            borderRadius: '16px',
+                            overflow: 'hidden',
+                            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+                            margin: 'auto'
                         }}
                     >
+                        {/* ── Header ── */}
                         <div
                             style={{
-                                background: 'linear-gradient(135deg,#006d8f,#1284b3)',
+                                background: 'linear-gradient(135deg,#005f7a,#0A83AE)',
                                 color: '#fff',
-                                padding: '24px 32px',
-                                position: 'relative'
+                                padding: '18px 24px 18px 28px',
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '14px'
                             }}
                         >
+                            <div
+                                style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '10px',
+                                    backgroundColor: 'rgba(255,255,255,0.15)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '20px',
+                                    flexShrink: 0
+                                }}
+                            >
+                                {isEditMode ? '✏️' : '✨'}
+                            </div>
+
+                            <div style={{ flex: 1 }}>
+                                <h2
+                                    style={{
+                                        margin: 0,
+                                        fontSize: '20px',
+                                        fontWeight: 700,
+                                        letterSpacing: '-0.2px'
+                                    }}
+                                >
+                                    {isEditMode ? 'Edit Prompt' : 'Add New Prompt'}
+                                </h2>
+                                <p
+                                    style={{
+                                        margin: '2px 0 0',
+                                        fontSize: '13px',
+                                        opacity: 0.85,
+                                        fontWeight: 400
+                                    }}
+                                >
+                                    {isEditMode
+                                        ? 'Update this prompt and send it back for approval.'
+                                        : 'Share a useful AI prompt with Stewart Title users.'}
+                                </p>
+                            </div>
+
                             <button
                                 onClick={isSaving ? undefined : closeAddPromptModal}
                                 disabled={isSaving}
                                 style={{
-                                    position: 'absolute',
-                                    top: '20px',
-                                    right: '20px',
-                                    width: '42px',
-                                    height: '42px',
-                                    borderRadius: '50%',
-                                    border: '1px solid rgba(255,255,255,.3)',
-                                    background: 'transparent',
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(255,255,255,0.25)',
+                                    background: 'rgba(255,255,255,0.1)',
                                     color: '#fff',
                                     cursor: isSaving ? 'not-allowed' : 'pointer',
-                                    fontSize: '22px',
-                                    opacity: isSaving ? 0.4 : 1
+                                    fontSize: '18px',
+                                    opacity: isSaving ? 0.4 : 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                    lineHeight: 1
                                 }}
                             >
                                 ✕
                             </button>
-
-                            <h2
-                                style={{
-                                    margin: 0,
-                                    fontSize: '30px',
-                                    fontWeight: 700
-                                }}
-                            >
-                                {isEditMode ? 'Edit Prompt' : 'Add New Prompt'}
-                            </h2>
-
-                            <div
-                                style={{
-                                    marginTop: '8px',
-                                    opacity: .9
-                                }}
-                            >
-                                {isEditMode
-                                    ? 'Update this prompt and send it back for approval.'
-                                    : 'Share a useful Copilot prompt with Stewart Title users'}
-                            </div>
                         </div>
 
+                        {/* ── Body ── */}
                         <div
                             style={{
-                                padding: '24px',
-                                backgroundColor: '#f5f7fa',
+                                padding: '16px 20px 20px',
+                                backgroundColor: '#f0f4f8',
                                 position: 'relative'
                             }}
                         >
+                            {/* Saving overlay */}
                             {isSaving && (
                                 <div
                                     style={{
                                         position: 'absolute',
                                         inset: 0,
-                                        backgroundColor: 'rgba(245,247,250,0.9)',
+                                        backgroundColor: 'rgba(240,244,248,0.92)',
                                         zIndex: 10,
                                         display: 'flex',
                                         flexDirection: 'column',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        gap: '14px',
-                                        borderRadius: '0 0 18px 18px',
+                                        gap: '12px',
+                                        borderRadius: '0 0 16px 16px',
                                         cursor: 'wait'
                                     }}
                                 >
                                     <div
                                         style={{
-                                            width: '46px',
-                                            height: '46px',
-                                            border: '4px solid rgba(10,131,174,0.2)',
+                                            width: '40px',
+                                            height: '40px',
+                                            border: '3px solid rgba(10,131,174,0.2)',
                                             borderTopColor: '#0A83AE',
                                             borderRadius: '50%',
                                             animation: 'cpsp-spin 0.75s linear infinite'
@@ -1356,32 +1388,47 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                             margin: 0,
                                             color: '#0A83AE',
                                             fontWeight: 600,
-                                            fontSize: '15px'
+                                            fontSize: '14px'
                                         }}
                                     >
                                         {isEditMode ? 'Saving changes...' : 'Submitting prompt...'}
                                     </p>
                                 </div>
                             )}
-                            {/* Prompt Details */}
+
+                            {/* ── Card: Prompt Details ── */}
                             <div
                                 style={{
                                     backgroundColor: '#ffffff',
-                                    borderRadius: '16px',
-                                    padding: '24px',
-                                    marginBottom: '20px',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                                    borderRadius: '12px',
+                                    padding: '18px 20px 20px',
+                                    marginBottom: '12px',
+                                    boxShadow: '0 1px 4px rgba(0,0,0,0.07)'
                                 }}
                             >
+                                {/* Section header */}
                                 <div
                                     style={{
-                                        color: '#006d8f',
-                                        fontWeight: 700,
-                                        letterSpacing: '1px',
-                                        marginBottom: '20px'
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        marginBottom: '14px',
+                                        paddingBottom: '10px',
+                                        borderBottom: '1px solid #eef0f3'
                                     }}
                                 >
-                                    PROMPT DETAILS
+                                    <span style={{ fontSize: '15px' }}>📋</span>
+                                    <span
+                                        style={{
+                                            fontSize: '11px',
+                                            fontWeight: 700,
+                                            letterSpacing: '0.8px',
+                                            color: '#006d8f',
+                                            textTransform: 'uppercase'
+                                        }}
+                                    >
+                                        Prompt Details
+                                    </span>
                                 </div>
 
                                 {/* Row 1 – Prompt Name | Tags */}
@@ -1389,19 +1436,22 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     style={{
                                         display: 'grid',
                                         gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                                        columnGap: '20px',
-                                        marginBottom: '20px'
+                                        columnGap: '16px',
+                                        marginBottom: '14px'
                                     }}
                                 >
                                     <div>
-                                        <label style={{
-                                            display: 'block',
-                                            marginBottom: '8px',
-                                            fontWeight: 600
-                                        }}>
-                                            Prompt Name *
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                marginBottom: '5px',
+                                                fontWeight: 600,
+                                                fontSize: '13px',
+                                                color: '#323130'
+                                            }}
+                                        >
+                                            Prompt Name <span style={{ color: '#c50f1f' }}>*</span>
                                         </label>
-
                                         <input
                                             value={newPrompt.title}
                                             onChange={(e) =>
@@ -1410,26 +1460,43 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                                     title: e.target.value
                                                 })
                                             }
+                                            placeholder="e.g. Summarise meeting notes"
                                             style={{
                                                 width: '100%',
-                                                padding: '12px',
-                                                borderRadius: '10px',
-                                                border: '1px solid #d1d1d1',
-                                                fontSize: '14px',
-                                                boxSizing: 'border-box'
+                                                padding: '9px 12px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #d1d5db',
+                                                fontSize: '13px',
+                                                boxSizing: 'border-box',
+                                                color: '#1f2937',
+                                                backgroundColor: '#fafafa',
+                                                outline: 'none'
                                             }}
                                         />
                                     </div>
 
                                     <div>
-                                        <label style={{
-                                            display: 'block',
-                                            marginBottom: '8px',
-                                            fontWeight: 600
-                                        }}>
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                marginBottom: '5px',
+                                                fontWeight: 600,
+                                                fontSize: '13px',
+                                                color: '#323130'
+                                            }}
+                                        >
                                             Tags
+                                            <span
+                                                style={{
+                                                    marginLeft: '6px',
+                                                    fontWeight: 400,
+                                                    color: '#8a8a8a',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                (optional, comma-separated)
+                                            </span>
                                         </label>
-
                                         <input
                                             value={newPrompt.tags}
                                             onChange={(e) =>
@@ -1438,13 +1505,17 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                                     tags: e.target.value
                                                 })
                                             }
+                                            placeholder="e.g. productivity, email, summarise"
                                             style={{
                                                 width: '100%',
-                                                padding: '12px',
-                                                borderRadius: '10px',
-                                                border: '1px solid #d1d1d1',
-                                                fontSize: '14px',
-                                                boxSizing: 'border-box'
+                                                padding: '9px 12px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #d1d5db',
+                                                fontSize: '13px',
+                                                boxSizing: 'border-box',
+                                                color: '#1f2937',
+                                                backgroundColor: '#fafafa',
+                                                outline: 'none'
                                             }}
                                         />
                                     </div>
@@ -1455,19 +1526,22 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                     style={{
                                         display: 'grid',
                                         gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                                        columnGap: '20px',
-                                        marginBottom: '20px'
+                                        columnGap: '16px',
+                                        marginBottom: '14px'
                                     }}
                                 >
                                     <div>
-                                        <label style={{
-                                            display: 'block',
-                                            marginBottom: '8px',
-                                            fontWeight: 600
-                                        }}>
-                                            AI Tool *
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                marginBottom: '5px',
+                                                fontWeight: 600,
+                                                fontSize: '13px',
+                                                color: '#323130'
+                                            }}
+                                        >
+                                            AI Tool <span style={{ color: '#c50f1f' }}>*</span>
                                         </label>
-
                                         <select
                                             value={newPrompt.aiTool}
                                             onChange={(e) =>
@@ -1478,39 +1552,35 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                             }
                                             style={{
                                                 width: '100%',
-                                                padding: '12px',
-                                                borderRadius: '10px',
-                                                border: '1px solid #d1d1d1',
-                                                fontSize: '14px',
-                                                boxSizing: 'border-box'
+                                                padding: '9px 12px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #d1d5db',
+                                                fontSize: '13px',
+                                                boxSizing: 'border-box',
+                                                color: newPrompt.aiTool ? '#1f2937' : '#8a8a8a',
+                                                backgroundColor: '#fafafa',
+                                                outline: 'none'
                                             }}
                                         >
-                                            <option value="">
-                                                Select AI Tool
-                                            </option>
-
-                                            {aiToolOptions.map(
-                                                (tool: string) => (
-                                                    <option
-                                                        key={tool}
-                                                        value={tool}
-                                                    >
-                                                        {tool}
-                                                    </option>
-                                                )
-                                            )}
+                                            <option value="">Select AI Tool</option>
+                                            {aiToolOptions.map((tool: string) => (
+                                                <option key={tool} value={tool}>{tool}</option>
+                                            ))}
                                         </select>
                                     </div>
 
                                     <div>
-                                        <label style={{
-                                            display: 'block',
-                                            marginBottom: '8px',
-                                            fontWeight: 600
-                                        }}>
-                                            Department *
+                                        <label
+                                            style={{
+                                                display: 'block',
+                                                marginBottom: '5px',
+                                                fontWeight: 600,
+                                                fontSize: '13px',
+                                                color: '#323130'
+                                            }}
+                                        >
+                                            Department <span style={{ color: '#c50f1f' }}>*</span>
                                         </label>
-
                                         <select
                                             value={newPrompt.department}
                                             onChange={(e) =>
@@ -1521,43 +1591,39 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                             }
                                             style={{
                                                 width: '100%',
-                                                padding: '12px',
-                                                borderRadius: '10px',
-                                                border: '1px solid #d1d1d1',
-                                                fontSize: '14px',
-                                                boxSizing: 'border-box'
+                                                padding: '9px 12px',
+                                                borderRadius: '8px',
+                                                border: '1px solid #d1d5db',
+                                                fontSize: '13px',
+                                                boxSizing: 'border-box',
+                                                color: newPrompt.department ? '#1f2937' : '#8a8a8a',
+                                                backgroundColor: '#fafafa',
+                                                outline: 'none'
                                             }}
                                         >
-                                            <option value="">
-                                                Select Department
-                                            </option>
-
-                                            {departmentOptions.map(
-                                                (department: string) => (
-                                                    <option
-                                                        key={department}
-                                                        value={department}
-                                                    >
-                                                        {department}
-                                                    </option>
-                                                )
-                                            )}
+                                            <option value="">Select Department</option>
+                                            {departmentOptions.map((department: string) => (
+                                                <option key={department} value={department}>{department}</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
 
                                 {/* Row 3 – Use Case (full width) */}
                                 <div>
-                                    <label style={{
-                                        display: 'block',
-                                        marginBottom: '8px',
-                                        fontWeight: 600
-                                    }}>
-                                        Use Case *
+                                    <label
+                                        style={{
+                                            display: 'block',
+                                            marginBottom: '5px',
+                                            fontWeight: 600,
+                                            fontSize: '13px',
+                                            color: '#323130'
+                                        }}
+                                    >
+                                        Use Case <span style={{ color: '#c50f1f' }}>*</span>
                                     </label>
-
                                     <textarea
-                                        rows={4}
+                                        rows={3}
                                         value={newPrompt.useCase}
                                         onChange={(e) =>
                                             setNewPrompt({
@@ -1565,42 +1631,72 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                                 useCase: e.target.value
                                             })
                                         }
+                                        placeholder="Describe when and why this prompt is useful…"
                                         style={{
                                             width: '100%',
-                                            padding: '12px',
-                                            borderRadius: '10px',
-                                            border: '1px solid #d1d1d1',
-                                            fontSize: '14px',
+                                            padding: '9px 12px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #d1d5db',
+                                            fontSize: '13px',
                                             resize: 'vertical',
-                                            boxSizing: 'border-box'
+                                            boxSizing: 'border-box',
+                                            color: '#1f2937',
+                                            backgroundColor: '#fafafa',
+                                            outline: 'none',
+                                            fontFamily: 'inherit',
+                                            lineHeight: '1.5'
                                         }}
                                     />
                                 </div>
                             </div>
 
-                            {/* Prompt Text */}
+                            {/* ── Card: Prompt Text ── */}
                             <div
                                 style={{
                                     backgroundColor: '#ffffff',
-                                    borderRadius: '16px',
-                                    padding: '24px',
-                                    marginBottom: '20px',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                                    borderRadius: '12px',
+                                    padding: '18px 20px 20px',
+                                    marginBottom: '14px',
+                                    boxShadow: '0 1px 4px rgba(0,0,0,0.07)'
                                 }}
                             >
+                                {/* Section header */}
                                 <div
                                     style={{
-                                        color: '#006d8f',
-                                        fontWeight: 700,
-                                        letterSpacing: '1px',
-                                        marginBottom: '20px'
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        marginBottom: '12px',
+                                        paddingBottom: '10px',
+                                        borderBottom: '1px solid #eef0f3'
                                     }}
                                 >
-                                    PROMPT TEXT
+                                    <span style={{ fontSize: '15px' }}>💬</span>
+                                    <span
+                                        style={{
+                                            fontSize: '11px',
+                                            fontWeight: 700,
+                                            letterSpacing: '0.8px',
+                                            color: '#006d8f',
+                                            textTransform: 'uppercase'
+                                        }}
+                                    >
+                                        Prompt Text
+                                    </span>
+                                    <span
+                                        style={{
+                                            marginLeft: 'auto',
+                                            fontSize: '11px',
+                                            color: '#8a8a8a',
+                                            fontWeight: 400
+                                        }}
+                                    >
+                                        The exact text that will be sent to the AI
+                                    </span>
                                 </div>
 
                                 <textarea
-                                    rows={10}
+                                    rows={7}
                                     value={newPrompt.promptText}
                                     onChange={(e) =>
                                         setNewPrompt({
@@ -1608,34 +1704,45 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                             promptText: e.target.value
                                         })
                                     }
+                                    placeholder="Enter the full prompt text here…"
                                     style={{
                                         width: '100%',
-                                        padding: '16px',
-                                        borderRadius: '12px',
-                                        border: '1px solid #d1d1d1',
-                                        fontSize: '14px',
+                                        padding: '12px 14px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #d1d5db',
+                                        fontSize: '13px',
                                         resize: 'vertical',
-                                        boxSizing: 'border-box'
+                                        boxSizing: 'border-box',
+                                        color: '#1f2937',
+                                        backgroundColor: '#fafafa',
+                                        outline: 'none',
+                                        fontFamily: 'inherit',
+                                        lineHeight: '1.6'
                                     }}
                                 />
                             </div>
 
-                            {/* Footer */}
+                            {/* ── Footer ── */}
                             <div
                                 style={{
                                     display: 'flex',
                                     justifyContent: 'flex-end',
-                                    gap: '12px'
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    paddingTop: '4px'
                                 }}
                             >
                                 <button
                                     onClick={isSaving ? undefined : closeAddPromptModal}
                                     disabled={isSaving}
                                     style={{
-                                        padding: '12px 22px',
-                                        borderRadius: '10px',
-                                        border: '1px solid #d1d1d1',
+                                        padding: '9px 20px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #d1d5db',
                                         backgroundColor: '#ffffff',
+                                        color: '#323130',
+                                        fontSize: '13px',
+                                        fontWeight: 500,
                                         cursor: isSaving ? 'not-allowed' : 'pointer',
                                         opacity: isSaving ? 0.5 : 1
                                     }}
@@ -1650,21 +1757,22 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                         backgroundColor: isSaving ? '#7bbfd6' : '#0A83AE',
                                         color: '#fff',
                                         border: 'none',
-                                        padding: '12px 24px',
-                                        borderRadius: '10px',
+                                        padding: '9px 22px',
+                                        borderRadius: '8px',
                                         cursor: isSaving ? 'not-allowed' : 'pointer',
                                         fontWeight: 600,
-                                        boxShadow: '0 4px 12px rgba(0,120,212,.25)',
+                                        fontSize: '13px',
+                                        boxShadow: isSaving ? 'none' : '0 2px 8px rgba(10,131,174,0.35)',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '8px'
+                                        gap: '7px'
                                     }}
                                 >
                                     {isSaving && (
                                         <span
                                             style={{
-                                                width: '16px',
-                                                height: '16px',
+                                                width: '14px',
+                                                height: '14px',
                                                 border: '2px solid rgba(255,255,255,0.4)',
                                                 borderTopColor: '#fff',
                                                 borderRadius: '50%',
