@@ -1,7 +1,7 @@
 export interface IPrompt {
   Id: number;
   Title: string;
-  AIToolOfChoice: string;
+  AiToolOfChoice: string;
   PromptText: string;
   UseCase: string;
   Tags: string;

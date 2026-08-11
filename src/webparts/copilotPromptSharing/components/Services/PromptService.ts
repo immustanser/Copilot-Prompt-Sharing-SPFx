@@ -4,11 +4,12 @@ import { getSP } from '../../pnpjsConfig';
 import { IPrompt } from '../Models/IPrompt';
 import { PermissionKind } from '@pnp/sp/security';
 import '@pnp/sp/fields';
+import '@pnp/sp/site-users/web';
 
 interface ISPListPromptItem {
     Id: number;
     Title: string;
-    AIToolOfChoice?: string;
+    AiToolOfChoice?: string;
     PromptText?: string;
     UseCase?: string;
     Tags?: string;
@@ -34,7 +35,7 @@ export default class PromptService {
 
     public async getPermissions() {
         const list = this.sp.web.lists.getByTitle(
-            'Copilot Prompt Sharing'
+            'Stewart AI Prompt Library'
         );
 
         return {
@@ -56,26 +57,34 @@ export default class PromptService {
     }
 
     public async getPrompts(): Promise<IPrompt[]> {
+        const currentUser = await this.sp.web.currentUser();
+        const currentUserId = currentUser.Id;
+
+        const visibilityFilter =
+            `Status eq 'Approved' or ` +
+            `((Status eq 'Send for Approval' or Status eq 'Rejected') and AuthorId eq ${currentUserId})`;
+
         const items: ISPListPromptItem[] = await this.sp.web.lists
-            .getByTitle('Copilot Prompt Sharing')
+            .getByTitle('Stewart AI Prompt Library')
             .items
             .select(
                 'Id',
                 'Title',
-                'AIToolOfChoice',
+                'AiToolOfChoice',
                 'PromptText',
                 'UseCase',
                 'Tags',
                 'Status',
                 'Department'
             )
+            .filter(visibilityFilter)
             .top(5000)();
 
         return items.map((item: ISPListPromptItem): IPrompt => {
             return {
                 Id: item.Id,
                 Title: item.Title || '',
-                AIToolOfChoice: item.AIToolOfChoice || '',
+                AiToolOfChoice: item.AiToolOfChoice || '',
                 PromptText: item.PromptText || '',
                 UseCase: item.UseCase || '',
                 Tags: item.Tags || '',
@@ -87,11 +96,11 @@ export default class PromptService {
 
     public async createPrompt(item: INewPromptItem): Promise<void> {
         await this.sp.web.lists
-            .getByTitle('Copilot Prompt Sharing')
+            .getByTitle('Stewart AI Prompt Library')
             .items
             .add({
                 Title: item.title,
-                AIToolOfChoice: item.aiTool,
+                AiToolOfChoice: item.aiTool,
                 PromptText: item.promptText,
                 UseCase: item.useCase,
                 Tags: item.tags,
@@ -105,12 +114,12 @@ export default class PromptService {
         item: INewPromptItem
     ): Promise<void> {
         await this.sp.web.lists
-            .getByTitle('Copilot Prompt Sharing')
+            .getByTitle('Stewart AI Prompt Library')
             .items
             .getById(itemId)
             .update({
                 Title: item.title,
-                AIToolOfChoice: item.aiTool,
+                AiToolOfChoice: item.aiTool,
                 PromptText: item.promptText,
                 UseCase: item.useCase,
                 Tags: item.tags,
@@ -124,7 +133,7 @@ export default class PromptService {
     ): Promise<void> {
 
         await this.sp.web.lists
-            .getByTitle('Copilot Prompt Sharing')
+            .getByTitle('Stewart AI Prompt Library')
             .items
             .getById(itemId)
             .delete();
@@ -133,7 +142,7 @@ export default class PromptService {
     public async getDepartmentChoices(): Promise<string[]> {
 
         const field = await this.sp.web.lists
-            .getByTitle('Copilot Prompt Sharing')
+            .getByTitle('Stewart AI Prompt Library')
             .fields
             .getByInternalNameOrTitle('Department')();
 

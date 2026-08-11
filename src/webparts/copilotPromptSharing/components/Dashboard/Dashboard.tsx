@@ -109,7 +109,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
         return {
             id: item.Id,
             promptName: item.Title,
-            aiTool: item.AIToolOfChoice,
+            aiTool: item.AiToolOfChoice,
             department: item.Department,
             status: item.Status,
             tags: item.Tags,
