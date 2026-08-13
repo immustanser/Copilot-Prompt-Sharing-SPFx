@@ -30,6 +30,7 @@ export interface INewPromptItem {
 
 export interface IDashboardData {
     currentUserId: number;
+    isApprover: boolean;
     prompts: IPrompt[];
     departmentChoices: string[];
     aiToolChoices: string[];
@@ -57,7 +58,22 @@ function mapItem(item: ISPListPromptItem): IPrompt {
     };
 }
 
-function buildVisibilityFilter(currentUserId: number): string {
+/**
+ * Builds the OData filter that controls which list items the current user sees.
+ *
+ * Visibility rules:
+ *  - Approved        → everyone
+ *  - Send for Approval → creator always; approvers see ALL pending items
+ *  - Rejected        → creator only (approvers do NOT see others' rejections)
+ */
+function buildVisibilityFilter(currentUserId: number, isApprover: boolean): string {
+    if (isApprover) {
+        return (
+            `Status eq 'Approved' or ` +
+            `Status eq 'Send for Approval' or ` +
+            `(Status eq 'Rejected' and AuthorId eq ${currentUserId})`
+        );
+    }
     return (
         `Status eq 'Approved' or ` +
         `((Status eq 'Send for Approval' or Status eq 'Rejected') and AuthorId eq ${currentUserId})`
@@ -72,33 +88,39 @@ export default class PromptService {
     }
 
     /**
-     * Initializes all dashboard data in two network round trips:
-     *   Round 1 – fetch current user ID (required for the item visibility filter)
-     *   Round 2 – six calls in parallel: items, dept choices, AI tool choices,
-     *              and all three permission checks.
+     * Initializes all dashboard data in three network round trips:
+     *   Round 1 – current user Id (needed by every subsequent filter)
+     *   Round 2 – approver check + field choices + permission checks in parallel
+     *             (approver result is required before the items query can be built)
+     *   Round 3 – list items with the role-correct visibility filter
+     *
+     * Total HTTP calls: 1 + 5 + 1 = 7 (same count as the previous implementation).
      */
     public async initializeDashboard(): Promise<IDashboardData> {
         const list = this.sp.web.lists.getByTitle(LIST_TITLE);
 
-        // Round 1 – only fetch the Id field to minimise payload
+        // ── Round 1: resolve current user ────────────────────────────────────────
         const currentUser = await this.sp.web.currentUser.select('Id')();
         const currentUserId: number = currentUser.Id;
 
-        const visibilityFilter = buildVisibilityFilter(currentUserId);
-
-        // Round 2 – all remaining calls in parallel
+        // ── Round 2: approver check + field metadata + permissions ────────────────
+        // The approver result must be known before the items query can be built,
+        // so items are intentionally moved to Round 3.
         const [
-            items,
+            approverItems,
             deptField,
             aiToolField,
             canAdd,
             canEdit,
             canDelete
         ] = await Promise.all([
-            list.items
-                .select(...PROMPT_SELECT_FIELDS)
-                .filter(visibilityFilter)
-                .top(5000)() as Promise<ISPListPromptItem[]>,
+            // Person fields expose their numeric Id as <InternalName>Id in OData.
+            this.sp.web.lists
+                .getByTitle('Copilot Prompt Approvers')
+                .items
+                .select('Id')
+                .filter(`ApproverId eq ${currentUserId}`)
+                .top(1)() as Promise<{ Id: number }[]>,
             list.fields.getByInternalNameOrTitle('Department')(),
             list.fields.getByInternalNameOrTitle('AiTool')(),
             list.currentUserHasPermissions(PermissionKind.AddListItems),
@@ -106,8 +128,17 @@ export default class PromptService {
             list.currentUserHasPermissions(PermissionKind.DeleteListItems)
         ]);
 
+        const isApprover = approverItems.length > 0;
+
+        // ── Round 3: list items with the role-correct security filter ─────────────
+        const items = await list.items
+            .select(...PROMPT_SELECT_FIELDS)
+            .filter(buildVisibilityFilter(currentUserId, isApprover))
+            .top(5000)() as ISPListPromptItem[];
+
         return {
             currentUserId,
+            isApprover,
             prompts: items.map(mapItem),
             departmentChoices: (deptField as { Choices?: string[] }).Choices || [],
             aiToolChoices: (aiToolField as { Choices?: string[] }).Choices || [],
@@ -117,14 +148,14 @@ export default class PromptService {
 
     /**
      * Lightweight post-CRUD refresh – fetches only list items (no permissions,
-     * no field metadata). Pass the userId already obtained at dashboard init.
+     * no field metadata). Pass the userId and isApprover flag cached at init.
      */
-    public async refreshPrompts(currentUserId: number): Promise<IPrompt[]> {
+    public async refreshPrompts(currentUserId: number, isApprover: boolean): Promise<IPrompt[]> {
         const items = await this.sp.web.lists
             .getByTitle(LIST_TITLE)
             .items
             .select(...PROMPT_SELECT_FIELDS)
-            .filter(buildVisibilityFilter(currentUserId))
+            .filter(buildVisibilityFilter(currentUserId, isApprover))
             .top(5000)() as ISPListPromptItem[];
 
         return items.map(mapItem);
@@ -148,7 +179,7 @@ export default class PromptService {
             .getByTitle(LIST_TITLE)
             .items
             .select(...PROMPT_SELECT_FIELDS)
-            .filter(buildVisibilityFilter(currentUser.Id))
+            .filter(buildVisibilityFilter(currentUser.Id, false))
             .top(5000)() as ISPListPromptItem[];
         return items.map(mapItem);
     }
@@ -190,6 +221,22 @@ export default class PromptService {
             .items
             .getById(itemId)
             .delete();
+    }
+
+    public async approvePrompt(itemId: number): Promise<void> {
+        await this.sp.web.lists
+            .getByTitle(LIST_TITLE)
+            .items
+            .getById(itemId)
+            .update({ Status: 'Approved' });
+    }
+
+    public async rejectPrompt(itemId: number): Promise<void> {
+        await this.sp.web.lists
+            .getByTitle(LIST_TITLE)
+            .items
+            .getById(itemId)
+            .update({ Status: 'Rejected' });
     }
 
     /** @deprecated Use initializeDashboard() for initial load. Kept for compatibility. */

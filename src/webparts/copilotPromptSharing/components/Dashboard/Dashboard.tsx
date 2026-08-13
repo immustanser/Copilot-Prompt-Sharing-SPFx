@@ -78,6 +78,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
     const [canAdd, setCanAdd] = React.useState(false);
     const [canEdit, setCanEdit] = React.useState(false);
     const [canDelete, setCanDelete] = React.useState(false);
+    const [isApprover, setIsApprover] = React.useState(false);
 
     const [departmentOptions, setDepartmentOptions] =
         React.useState<string[]>([]);
@@ -88,9 +89,11 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
     const [isPageLoading, setIsPageLoading] = React.useState(true);
     const [isSaving, setIsSaving] = React.useState(false);
     const [deletingId, setDeletingId] = React.useState<number | null>(null);
+    const [approvingId, setApprovingId] = React.useState<number | null>(null);
+    const [rejectingId, setRejectingId] = React.useState<number | null>(null);
 
     const [selectedStatus, setSelectedStatus] =
-        React.useState<string>('All');
+        React.useState<string>('Approved');
 
     React.useEffect(() => {
         void loadPrompts();
@@ -115,6 +118,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
             setCanAdd(data.permissions.canAdd);
             setCanEdit(data.permissions.canEdit);
             setCanDelete(data.permissions.canDelete);
+            setIsApprover(data.isApprover);
         } catch (error) {
             console.error('Error loading dashboard:', error);
             showToast('Failed to load prompts. Please refresh the page.', 'error');
@@ -344,7 +348,8 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
 
                 // Lightweight refresh to get the new item with its server-assigned Id
                 const freshItems = await promptService.refreshPrompts(
-                    currentUserIdRef.current
+                    currentUserIdRef.current,
+                    isApprover
                 );
                 setPrompts(freshItems);
             }
@@ -391,6 +396,49 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
             showToast('Unable to delete prompt. Please try again.', 'error');
         } finally {
             setDeletingId(null);
+        }
+    };
+
+    const approvePrompt = async (itemId: number): Promise<void> => {
+        setApprovingId(itemId);
+        try {
+            await promptService.approvePrompt(itemId);
+
+            // Optimistic update — Approved items are visible to everyone, so the
+            // item stays in the list with its new status; no refresh required.
+            setPrompts(prev =>
+                prev.map(p => p.Id === itemId ? { ...p, Status: 'Approved' } : p)
+            );
+            showToast('Prompt approved successfully.');
+
+        } catch (error) {
+            console.error('Error approving prompt:', error);
+            showToast('Unable to approve prompt. Please try again.', 'error');
+        } finally {
+            setApprovingId(null);
+        }
+    };
+
+    const rejectPrompt = async (itemId: number): Promise<void> => {
+        setRejectingId(itemId);
+        try {
+            await promptService.rejectPrompt(itemId);
+
+            // Server refresh required — if the approver rejected another user's prompt
+            // the item becomes invisible to them (visibility rule: Rejected items are
+            // only shown to the creator). refreshPrompts applies the correct filter.
+            const freshItems = await promptService.refreshPrompts(
+                currentUserIdRef.current,
+                isApprover
+            );
+            setPrompts(freshItems);
+            showToast('Prompt rejected successfully.');
+
+        } catch (error) {
+            console.error('Error rejecting prompt:', error);
+            showToast('Unable to reject prompt. Please try again.', 'error');
+        } finally {
+            setRejectingId(null);
         }
     };
 
@@ -837,6 +885,7 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                                 alignItems: 'center'
                                             }}
                                         >
+                                            {/* ── Edit / Delete (non-pending items only) ── */}
                                             {item.status !== 'Send for Approval' && (
                                                 deletingId === item.id ? (
                                                     <span
@@ -901,6 +950,105 @@ const Dashboard = (props: IDashboardProps): JSX.Element => {
                                                             }
                                                         >
                                                             🗑️
+                                                        </span>
+                                                    </>
+                                                )
+                                            )}
+
+                                            {/* ── Approve / Reject (approvers only, pending items only) ── */}
+                                            {isApprover && item.status === 'Send for Approval' && (
+                                                approvingId === item.id ? (
+                                                    <span
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '5px',
+                                                            fontSize: '12px',
+                                                            color: '#107C10',
+                                                            fontWeight: 600
+                                                        }}
+                                                    >
+                                                        <span
+                                                            style={{
+                                                                width: '14px',
+                                                                height: '14px',
+                                                                border: '2px solid rgba(16,124,16,0.25)',
+                                                                borderTopColor: '#107C10',
+                                                                borderRadius: '50%',
+                                                                display: 'inline-block',
+                                                                flexShrink: 0,
+                                                                animation: 'cpsp-spin 0.75s linear infinite'
+                                                            }}
+                                                        />
+                                                        Approving...
+                                                    </span>
+                                                ) : rejectingId === item.id ? (
+                                                    <span
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '5px',
+                                                            fontSize: '12px',
+                                                            color: '#D13438',
+                                                            fontWeight: 600
+                                                        }}
+                                                    >
+                                                        <span
+                                                            style={{
+                                                                width: '14px',
+                                                                height: '14px',
+                                                                border: '2px solid rgba(209,52,56,0.25)',
+                                                                borderTopColor: '#D13438',
+                                                                borderRadius: '50%',
+                                                                display: 'inline-block',
+                                                                flexShrink: 0,
+                                                                animation: 'cpsp-spin 0.75s linear infinite'
+                                                            }}
+                                                        />
+                                                        Rejecting...
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <span
+                                                            onClick={
+                                                                approvingId === null && rejectingId === null && deletingId === null
+                                                                    ? () => approvePrompt(item.id)
+                                                                    : undefined
+                                                            }
+                                                            title="Approve this prompt"
+                                                            style={{
+                                                                fontSize: '18px',
+                                                                lineHeight: 1,
+                                                                cursor: approvingId === null && rejectingId === null && deletingId === null
+                                                                    ? 'pointer'
+                                                                    : 'not-allowed',
+                                                                opacity: approvingId === null && rejectingId === null && deletingId === null
+                                                                    ? 1
+                                                                    : 0.4
+                                                            }}
+                                                        >
+                                                            ✅
+                                                        </span>
+
+                                                        <span
+                                                            onClick={
+                                                                approvingId === null && rejectingId === null && deletingId === null
+                                                                    ? () => rejectPrompt(item.id)
+                                                                    : undefined
+                                                            }
+                                                            title="Reject this prompt"
+                                                            style={{
+                                                                fontSize: '18px',
+                                                                lineHeight: 1,
+                                                                cursor: approvingId === null && rejectingId === null && deletingId === null
+                                                                    ? 'pointer'
+                                                                    : 'not-allowed',
+                                                                opacity: approvingId === null && rejectingId === null && deletingId === null
+                                                                    ? 1
+                                                                    : 0.4
+                                                            }}
+                                                        >
+                                                            ❌
                                                         </span>
                                                     </>
                                                 )
