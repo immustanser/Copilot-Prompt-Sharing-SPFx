@@ -3,7 +3,7 @@
   "solution": {
     "name": "copilot-prompt-sharing-client-side-solution",
     "id": "2d402fb5-3d6a-4bb0-8526-c67d310a263f",
-    "version": "1.0.0.0",
+    "version": "1.0.0.1",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
